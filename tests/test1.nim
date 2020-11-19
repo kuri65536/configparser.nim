@@ -4,9 +4,19 @@
 # the letter 't').
 #
 # To run these tests, simply execute `nimble test`.
-
+import streams
 import unittest
 
 import py_configparser
-test "can add":
-  check add(5, 5) == 10
+
+
+test "can basic parse":
+    var ini = ConfigParser()
+    ini.read(newStringStream("test = test"))
+    check ini.get("", "test") == "test"
+
+test "can omit comment 1":
+    var ini = ConfigParser()
+    ini.read(newStringStream("test = test  # test comment"))
+    check ini.get("", "test") == "test"
+

@@ -153,7 +153,7 @@ type
     kind: TokKind            # the type of the token
     literal: string          # the parsed (string) literal
 
-  SectionTable = Table[string, string]
+  SectionTable = TableRef[string, string]
 
   ConfigParser* = ref object of RootObj
     cur_state: ParseResult
@@ -214,12 +214,13 @@ proc parse_section_line(c: var ConfigParser, line: string): ParseResult =  # {{{
     var sec = right.strip()
     c.cur_section_name = sec
     if sec not_in c.sections():
-        c.data.add(sec, initTable[string, string]())
+        c.data.add(sec, newTable[string, string]())
     return ParseResult.section
 
 
 proc parse_option_value(c: var ConfigParser, line: string  # {{{1
-                        ): tuple[st: ParseResult, parsed: string] =  # {{{1
+                        ): tuple[st: ParseResult, parsed: string] =
+    echo "check:" & line
     var f_opt = true
     var opt, val: string
     for n in 0..len(line) - 1:
@@ -230,6 +231,7 @@ proc parse_option_value(c: var ConfigParser, line: string  # {{{1
             if i == '=':
                 f_opt = false
                 opt = opt.strip()
+                echo "got-opt:" & opt
                 continue
             if i == '[':
                 discard c.parse_finish(opt)
@@ -240,18 +242,20 @@ proc parse_option_value(c: var ConfigParser, line: string  # {{{1
             if i == '#':
                 break
             val &= $i
+    echo "finish-check:" & opt & "-" & val
     if f_opt:
         return (opt_or_invalid, opt)
     if c.cur_section.hasKey(opt):
         return (opt_and_dup, "")
     echo fmt"add {c.cur_section_name} <= {opt},{val}"
+    val = val.strip()
     c.cur_section.add(opt, val)
     return (opt_and_val, val)
 
 
 proc read*(c: var ConfigParser, input: Stream, filename = ""): void =  # {{{1
     c.data = newTable[string, SectionTable]()
-    c.cur_section = initTable[string, string]()
+    c.cur_section = newTable[string, string]()
     c.cur_section_name = ""
     c.data.add("", c.cur_section)
 
@@ -729,7 +733,12 @@ proc delSectionKey*(dict: var Config, section, key: string) =
 
 proc get*(self: ConfigParser, section, option: string): string =  # {{{1
     var ret = ""
-    return ret
+    if not self.data.hasKey(section):
+        raise newException(KeyError, "does not have section" & section)
+    var tbl = self.data[section]
+    if not tbl.hasKey(option):
+        raise newException(KeyError, "does not have option: " & option)
+    return tbl[option]
 
 
 proc options*(self: ConfigParser, section: string): seq[string] =  # {{{1
