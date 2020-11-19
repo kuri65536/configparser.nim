@@ -113,16 +113,22 @@
 import
   hashes, strutils, lexbase, streams, tables
 
+import strformat
+
 include "system/inclrtl"
 
 type
-  CfgEventKind* = enum ## enumeration of all events that may occur when parsing
-    cfgEof,             ## end of file reached
-    cfgSectionStart,    ## a ``[section]`` has been parsed
-    cfgKeyValuePair,    ## a ``key=value`` pair has been detected
-    cfgOption,          ## a ``--key=value`` command line option
-    cfgError            ## an error occurred during parsing
+  ParseResult = enum ## enumeration of all events that may occur when parsing
+    opt_and_val,        ## end of file reached
+    opt_and_dup,
+    opt_or_invalid,
+    in_opt,
+    in_empty,
+    in_val,
+    section,            ## a ``[section]`` has been parsed
+    in_error_section,   ## an error occurred during parsing
 
+  #[
   CfgEvent* = object of RootObj ## describes a parsing event
     case kind*: CfgEventKind    ## the kind of the event
     of cfgEof: nil
@@ -138,6 +144,7 @@ type
     of cfgError:                 ## the parser encountered an error: `msg`
       msg*: string               ## contains the error message. No exceptions
                                  ## are thrown if a parse error occurs.
+  ]#
 
   TokKind = enum
     tkInvalid, tkEof,
@@ -146,19 +153,125 @@ type
     kind: TokKind            # the type of the token
     literal: string          # the parsed (string) literal
 
-  CfgParser* = object of BaseLexer ## the parser object.
-    tok: Token
-    filename: string
+  SectionTable = Table[string, string]
+
+  ConfigParser* = ref object of RootObj
+    cur_state: ParseResult
+    cur_section: SectionTable
+    cur_section_name: string
+    cur_opt, cur_val: string
+    data: TableRef[string, SectionTable]
+
+  SafeConfigParser* = ConfigParser
+
 
 # implementation
 
 const
   SymChars = {'a'..'z', 'A'..'Z', '0'..'9', '_', '\x80'..'\xFF', '.', '/', '\\', '-'}
 
-proc rawGetTok(c: var CfgParser, tok: var Token) {.gcsafe.}
 
-proc open*(c: var CfgParser, input: Stream, filename: string,
-           lineOffset = 0) {.rtl, extern: "npc$1".} =
+proc sections*(self: ConfigParser): seq[string] =  # {{{1
+    for i in self.data.keys():
+        result.add(i)
+
+
+proc remove_comment(src: string, space: bool): string =  # {{{1
+    var ret = ""
+    var f_quote = false
+    for i in src:
+        if i == '#':
+            break
+        if f_quote:
+            if i == '"':
+                f_quote = false
+        else:
+            if i == '"':
+                f_quote = true
+        ret &= $i
+    return ret
+
+
+proc parse_finish(c: var ConfigParser, line: string): ParseResult =  # {{{1
+    case c.cur_state:
+    of in_val:
+        return ParseResult.in_val
+    else:
+        discard
+    return ParseResult.in_empty
+
+
+proc parse_section_line(c: var ConfigParser, line: string): ParseResult =  # {{{1
+    var left = line.strip(leading = true)
+    if not left.startsWith("["):
+        return ParseResult.in_empty
+    left = left[1..^1]
+    var right = remove_comment(left, space = true)
+    if not right.endswith("]"):
+        return ParseResult.in_error_section
+    right = right[0..^2]
+
+    var sec = right.strip()
+    c.cur_section_name = sec
+    if sec not_in c.sections():
+        c.data.add(sec, initTable[string, string]())
+    return ParseResult.section
+
+
+proc parse_option_value(c: var ConfigParser, line: string  # {{{1
+                        ): tuple[st: ParseResult, parsed: string] =  # {{{1
+    var f_opt = true
+    var opt, val: string
+    for n in 0..len(line) - 1:
+        var i = line[n]
+        if f_opt:
+            if i == '#':
+                break
+            if i == '=':
+                f_opt = false
+                opt = opt.strip()
+                continue
+            if i == '[':
+                discard c.parse_finish(opt)
+                var ret = c.parse_section_line(line[n..^1])
+                return (ret, "")
+            opt &= $i
+        else:
+            if i == '#':
+                break
+            val &= $i
+    if f_opt:
+        return (opt_or_invalid, opt)
+    if c.cur_section.hasKey(opt):
+        return (opt_and_dup, "")
+    echo fmt"add {c.cur_section_name} <= {opt},{val}"
+    c.cur_section.add(opt, val)
+    return (opt_and_val, val)
+
+
+proc read*(c: var ConfigParser, input: Stream, filename = ""): void =  # {{{1
+    c.data = newTable[string, SectionTable]()
+    c.cur_section = initTable[string, string]()
+    c.cur_section_name = ""
+    c.data.add("", c.cur_section)
+
+    var line: string
+    var cur = ParseResult.in_empty
+    while input.readLine(line):
+        var (st, parsed) = c.parse_option_value(line)
+        case st:
+        of opt_and_val:
+            cur = ParseResult.in_val
+        of opt_and_dup:
+            cur = ParseResult.in_empty
+        of opt_or_invalid:
+            if cur == in_val:
+                c.cur_val &= parsed
+        else:
+            discard
+
+    #[
+
   ## initializes the parser with an input stream. `Filename` is only used
   ## for nice error messages. `lineOffset` can be used to influence the line
   ## number information in the generated error messages.
@@ -168,7 +281,16 @@ proc open*(c: var CfgParser, input: Stream, filename: string,
   c.tok.literal = ""
   inc(c.lineNumber, lineOffset)
   rawGetTok(c, c.tok)
+    ]#
 
+
+proc read*(c: var ConfigParser, input: string) =  # {{{1
+    var fp = newFileStream(input, fmRead)
+    defer: fp.close
+    c.read(fp, input)
+
+
+#[
 proc close*(c: var CfgParser) {.rtl, extern: "npc$1".} =
   ## closes the parser `c` and its associated input stream.
   lexbase.close(c)
@@ -446,6 +568,7 @@ proc next*(c: var CfgParser): CfgEvent {.rtl, extern: "npc$1".} =
     result.kind = cfgError
     result.msg = errorStr(c, "invalid token: " & c.tok.literal)
     rawGetTok(c, c.tok)
+]#
 
 # ---------------- Configuration file related operations ----------------
 type
@@ -463,6 +586,7 @@ proc loadConfig*(stream: Stream, filename: string = "[stream]"): Config =
   var curSection = "" ## Current section,
                       ## the default value of the current section is "",
                       ## which means that the current section is a common
+  #[
   var p: CfgParser
   open(p, stream, filename)
   while true:
@@ -488,6 +612,7 @@ proc loadConfig*(stream: Stream, filename: string = "[stream]"): Config =
       break
   close(p)
   result = dict
+  ]#
 
 proc loadConfig*(filename: string): Config =
   ## Load the specified configuration file into a new Config instance.
@@ -600,3 +725,20 @@ proc delSectionKey*(dict: var Config, section, key: string) =
         dict.del(section)
       else:
         dict[section].del(key)
+
+
+proc get*(self: ConfigParser, section, option: string): string =  # {{{1
+    var ret = ""
+    return ret
+
+
+proc options*(self: ConfigParser, section: string): seq[string] =  # {{{1
+    var ret: seq[string] = @[]
+    return ret
+
+
+proc has_section*(self: ConfigParser, section: string): bool =  # {{{1
+    return self.sections().contains(section)
+
+
+# vi: ft=nim:et:ts=4:fdm=marker:nowrap
