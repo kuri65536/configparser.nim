@@ -189,6 +189,8 @@ proc remove_comment(src: string, space: bool): string =  # {{{1
             if i == '"':
                 f_quote = true
         ret &= $i
+    if space:
+        ret = ret.strip()
     return ret
 
 
@@ -203,10 +205,12 @@ proc parse_finish(c: var ConfigParser, line: string): ParseResult =  # {{{1
 
 proc parse_section_line(c: var ConfigParser, line: string): ParseResult =  # {{{1
     var left = line.strip(leading = true)
+    echo "section" & left
     if not left.startsWith("["):
         return ParseResult.in_empty
     left = left[1..^1]
     var right = remove_comment(left, space = true)
+    echo "section:right:" & right
     if not right.endswith("]"):
         return ParseResult.in_error_section
     right = right[0..^2]
@@ -214,13 +218,16 @@ proc parse_section_line(c: var ConfigParser, line: string): ParseResult =  # {{{
     var sec = right.strip()
     c.cur_section_name = sec
     if sec not_in c.sections():
-        c.data.add(sec, newTable[string, string]())
+        echo "section:add:" & sec
+        c.cur_section = newTable[string, string]()
+        c.data.add(sec, c.cur_section)
+    else:
+        c.cur_section = c.data[sec]
     return ParseResult.section
 
 
 proc parse_option_value(c: var ConfigParser, line: string  # {{{1
                         ): tuple[st: ParseResult, parsed: string] =
-    echo "check:" & line
     var f_opt = true
     var opt, val: string
     for n in 0..len(line) - 1:
@@ -231,7 +238,6 @@ proc parse_option_value(c: var ConfigParser, line: string  # {{{1
             if i == '=':
                 f_opt = false
                 opt = opt.strip()
-                echo "got-opt:" & opt
                 continue
             if i == '[':
                 discard c.parse_finish(opt)
@@ -242,12 +248,10 @@ proc parse_option_value(c: var ConfigParser, line: string  # {{{1
             if i == '#':
                 break
             val &= $i
-    echo "finish-check:" & opt & "-" & val
     if f_opt:
         return (opt_or_invalid, opt)
     if c.cur_section.hasKey(opt):
         return (opt_and_dup, "")
-    echo fmt"add {c.cur_section_name} <= {opt},{val}"
     val = val.strip()
     c.cur_section.add(opt, val)
     return (opt_and_val, val)
