@@ -158,7 +158,7 @@ type
     kind: TokKind            # the type of the token
     literal: string          # the parsed (string) literal
 
-  SectionTable = TableRef[string, string]
+  SectionTable* = TableRef[string, string]
 
   ConfigParser* = ref object of RootObj
     cur_state: ParseResult
@@ -802,6 +802,83 @@ proc get*(self: ConfigParser, section, option: string): string =  # {{{1
     if not tbl.hasKey(option):
         raise newException(KeyError, "does not have option: " & option)
     return tbl[option]
+
+
+proc get*(self: SectionTable, option: string): string =  # {{{1
+    var ret = ""
+    if not self.hasKey(option):
+        raise newException(KeyError, "does not have option: " & option)
+    return self[option]
+
+
+proc getint*(self: ConfigParser, section, option: string): int =  # {{{1
+    var ret = parseInt(self.get(section, option))
+    return ret
+
+
+proc getint*(self: SectionTable, option: string): int =  # {{{1
+    var ret = parseInt(self[option])
+    return ret
+
+
+proc getfloat*(self: ConfigParser, section, option: string): float =  # {{{1
+    var ret = parseFloat(self.get(section, option))
+    return ret
+
+
+proc getfloat*(self: SectionTable, option: string): float =  # {{{1
+    var ret = parseFloat(self[option])
+    return ret
+
+
+proc getboolean_chk(src: string): bool =  # {{{1
+    for pat in @["yes", "on", "true", "1"]:
+        if src == pat:
+            return true
+    for pat in @["no", "off", "false", "0"]:
+        if src == pat:
+            return false
+    raise newException(ValueError, ":" & src)
+
+
+proc getboolean*(self: ConfigParser, section, option: string): bool =  # {{{1
+    var src = self.get(section, option)
+    return getboolean_chk(src)
+
+
+proc getboolean*(self: SectionTable, option: string): bool =  # {{{1
+    var src = self[option]
+    return getboolean_chk(src)
+
+
+proc getlist_parse*(src: string): seq[string] =  # {{{1
+    var ret: seq[string] = @[]
+    for i in src.split(' '):
+        if len(i) < 1:
+            continue
+        ret.add(i)
+    return ret
+
+
+proc getlist*(self: ConfigParser, section, option: string  # {{{1
+              ): seq[string] =  # {{{1
+    var src = self.get(section, option)
+    return getlist_parse(src)
+
+
+proc getlist*(self: SectionTable, option: string): seq[string] =  # {{{1
+    var src = self[option]
+    return getlist_parse(src)
+
+
+proc `[]`*(self: var ConfigParser, section: string): SectionTable =  # {{{1
+    if not self.data.hasKey(section):
+        raise newException(ValueError, section & " not found")
+    return self.data[section]
+
+
+proc `[]`*(self: SectionTable, option: string): string =  # {{{1
+    return self[][option]
 
 
 proc options*(self: ConfigParser, section: string): seq[string] =  # {{{1
