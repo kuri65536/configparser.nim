@@ -37,8 +37,8 @@ test "can basic parse - sections":
     check ini.get("sec3", "hij") == "lmn"
 
 test "can omit comment 1":
-    var ini = ConfigParser()
-    ini.read(newStringStream("test = test  # test comment"))
+    var ini = initConfigParser()
+    ini.read(newStringStream("test = test  ; test comment"))
     check ini.get("", "test") == "test"
 
 test "can omit comment 2 - sections":
@@ -50,3 +50,4 @@ test "can omit comment 2 - sections":
     check ini.sections().contains("sec2")
     check ini.sections().contains("sec3")
 
+# vi: ft=nim:et:ts=4:fdm=marker

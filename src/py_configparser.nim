@@ -128,6 +128,11 @@ type
     section,            ## a ``[section]`` has been parsed
     in_error_section,   ## an error occurred during parsing
 
+  DuplicateSectionError* = object of ValueError
+  DuplicateOptionError* = object of ValueError
+  ParsingError* = object of ValueError
+  MissingSectionHeaderError* = object of ValueError
+
   #[
   CfgEvent* = object of RootObj ## describes a parsing event
     case kind*: CfgEventKind    ## the kind of the event
@@ -161,6 +166,7 @@ type
     cur_section_name: string
     cur_opt, cur_val: string
     data: TableRef[string, SectionTable]
+    inline_comment_prefixes*: seq[string]
 
   SafeConfigParser* = ConfigParser
 
@@ -171,9 +177,39 @@ const
   SymChars = {'a'..'z', 'A'..'Z', '0'..'9', '_', '\x80'..'\xFF', '.', '/', '\\', '-'}
 
 
+proc initConfigParser*(): ConfigParser =  # {{{1
+    return ConfigParser(
+        inline_comment_prefixes: @[";"])
+
+
 proc sections*(self: ConfigParser): seq[string] =  # {{{1
     for i in self.data.keys():
         result.add(i)
+
+
+proc is_comment(self: ConfigParser, n: int, line: string, f_space: bool  # {{{1
+                ): bool =  # {{{1
+    if not f_space:
+        return false
+    var blks: seq[string] = @[]
+    var ch_cur = line[n]
+    for ch in self.inline_comment_prefixes:
+        if len(ch) > 1:
+            blks.add(ch)
+            continue
+        if ch[0] == ch_cur:
+            return true
+    if len(blks) < 1:
+        return false
+    for blk in blks:
+        echo "check " & blk & " => for " & line[n ..^ 1]
+        var m = n + len(blk) - 1
+        if m >= len(line):
+            continue
+        var blk_cur = line[n..m]
+        if blk_cur == blk:
+            return true
+    return false
 
 
 proc remove_comment(src: string, space: bool): string =  # {{{1
@@ -229,11 +265,12 @@ proc parse_section_line(c: var ConfigParser, line: string): ParseResult =  # {{{
 proc parse_option_value(c: var ConfigParser, line: string  # {{{1
                         ): tuple[st: ParseResult, parsed: string] =
     var f_opt = true
+    var f_space = false
     var opt, val: string
     for n in 0..len(line) - 1:
         var i = line[n]
         if f_opt:
-            if i == '#':
+            if c.is_comment(n, line, true):
                 break
             if i == '=':
                 f_opt = false
@@ -245,7 +282,9 @@ proc parse_option_value(c: var ConfigParser, line: string  # {{{1
                 return (ret, "")
             opt &= $i
         else:
-            if i == '#':
+            var f = f_space
+            f_space = (i == ' ')
+            if c.is_comment(n, line, f):
                 break
             val &= $i
     if f_opt:
@@ -257,7 +296,10 @@ proc parse_option_value(c: var ConfigParser, line: string  # {{{1
     return (opt_and_val, val)
 
 
-proc read*(c: var ConfigParser, input: Stream, filename = ""): void =  # {{{1
+# proc read*(c: var ConfigParser, input: IEnumerable[string]): void =  # {{{1
+
+
+proc read*(c: var ConfigParser, input: iterator(): string): void =  # {{{1
     c.data = newTable[string, SectionTable]()
     c.cur_section = newTable[string, string]()
     c.cur_section_name = ""
@@ -265,7 +307,7 @@ proc read*(c: var ConfigParser, input: Stream, filename = ""): void =  # {{{1
 
     var line: string
     var cur = ParseResult.in_empty
-    while input.readLine(line):
+    for line in input():
         var (st, parsed) = c.parse_option_value(line)
         case st:
         of opt_and_val:
@@ -292,10 +334,27 @@ proc read*(c: var ConfigParser, input: Stream, filename = ""): void =  # {{{1
     ]#
 
 
+proc read*(c: var ConfigParser, input: Stream, filename = ""): void =  # {{{1
+    iterator iter_lines(): string =
+        var line = ""
+        while input.readLine(line):
+            yield line
+
+    c.read(iter_lines)
+
+
 proc read*(c: var ConfigParser, input: string) =  # {{{1
     var fp = newFileStream(input, fmRead)
     defer: fp.close
     c.read(fp, input)
+
+
+proc read_string*(c: var ConfigParser, input: string) =  # {{{1
+    iterator iter_lines(): string =
+        for line in input.splitLines():
+            yield line
+
+    c.read(iter_lines)
 
 
 #[
@@ -752,6 +811,12 @@ proc options*(self: ConfigParser, section: string): seq[string] =  # {{{1
 
 proc has_section*(self: ConfigParser, section: string): bool =  # {{{1
     return self.sections().contains(section)
+
+
+proc has_option*(self: ConfigParser, section, option: string): bool =  # {{{1
+    if not self.data.hasKey(section):
+        return false
+    return self.data[section].hasKey(option)
 
 
 # vi: ft=nim:et:ts=4:fdm=marker:nowrap
