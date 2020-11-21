@@ -846,8 +846,12 @@ proc get*(self: SectionTable, option: string): string =  # {{{1
     return self[option]
 
 
-proc getint*(self: ConfigParser, section, option: string): int =  # {{{1
-    var ret = parseInt(self.get(section, option))
+proc getint*(self: ConfigParser, section, option: string, raw = false,  # {{{1
+             vars: TableRef[string, string] = nil,
+             fallback: tuple[en: bool, n: int] = (false, 0)): int =
+    var src = if fallback.en: self.get(section, option, raw, vars, $fallback.n)
+              else:           self.get(section, option, raw, vars)
+    var ret = parseInt(src)
     return ret
 
 
@@ -856,9 +860,17 @@ proc getint*(self: SectionTable, option: string): int =  # {{{1
     return ret
 
 
-proc getfloat*(self: ConfigParser, section, option: string): float =  # {{{1
-    var ret = parseFloat(self.get(section, option))
-    return ret
+proc getfloat*(self: ConfigParser, section, option: string, raw = false,  # {{{1
+               vars: TableRef[string, string] = nil,
+               fallback: tuple[en: bool, n: float] = (false, 0.0)): float =
+    try:
+        var src = self.get(section, option, raw, vars)
+        var ret = parseFloat(src)
+        return ret
+    except KeyError as e:
+        if fallback.en:
+            return fallback.n
+        raise e
 
 
 proc getfloat*(self: SectionTable, option: string): float =  # {{{1
@@ -876,9 +888,16 @@ proc getboolean_chk(src: string): bool =  # {{{1
     raise newException(ValueError, ":" & src)
 
 
-proc getboolean*(self: ConfigParser, section, option: string): bool =  # {{{1
-    var src = self.get(section, option)
-    return getboolean_chk(src)
+proc getboolean*(self: ConfigParser, section, option: string, raw = false,  # {{{1
+                 vars: TableRef[string, string] = nil,
+                 fallback: tuple[en: bool, n: bool] = (false, false)): bool =
+    try:
+        var src = self.get(section, option, raw, vars)
+        return getboolean_chk(src)
+    except KeyError as e:
+        if fallback.en:
+            return fallback.n
+        raise e
 
 
 proc getboolean*(self: SectionTable, option: string): bool =  # {{{1
@@ -895,10 +914,17 @@ proc getlist_parse*(src: string): seq[string] =  # {{{1
     return ret
 
 
-proc getlist*(self: ConfigParser, section, option: string  # {{{1
-              ): seq[string] =  # {{{1
-    var src = self.get(section, option)
-    return getlist_parse(src)
+proc getlist*(self: ConfigParser, section, option: string, raw = false,  # {{{1
+              vars: TableRef[string, string] = nil,
+              fallback: tuple[en: bool, val: seq[string]] = (false, @[])
+              ): seq[string] =
+    try:
+        var src = self.get(section, option, raw, vars)
+        return getlist_parse(src)
+    except KeyError as e:
+        if fallback.en:
+            return fallback.val
+        raise e
 
 
 proc getlist*(self: SectionTable, option: string): seq[string] =  # {{{1

@@ -59,7 +59,7 @@ test "can check options 1":
     check ini.has_option("sec1", "aaa") == true
     check ini.has_option("sec1", "bbb") == false
 
-test "fallback test":
+test "fallback test 1":
     var ini = ConfigParser()
     ini.read(newStringStream("test = default\n" &
                              "[sec1]\ntest = input\n" &
@@ -72,5 +72,21 @@ test "fallback test":
     check ini.get("sec2", "test", fallback = "fb") == "default"
     check ini.get("sec2", "test", vars = vars) == "vars"
     check ini.get("sec3", "none", fallback = "fb") == "fb"
+
+test "fallback test 2":
+    var ini = ConfigParser()
+    ini.read(newStringStream("[sec1]\na = 1\n" &
+                             "[sec2]\nb = 2.5\n" &
+                             "[sec3]\nc = true\n" &
+                             "[sec4]\nd = 1 2 3 4 5"))
+    check ini.getint("sec1", "a") == 1
+    check ini.getint("sec1", "b", fallback=(true, 2)) == 2
+    check ini.getfloat("sec2", "b") == 2.5
+    check ini.getfloat("sec2", "c", fallback=(true, 3.5)) == 3.5
+    check ini.getboolean("sec3", "c") == true
+    check ini.getboolean("sec3", "d", fallback=(true, false)) == false
+    check ini.getboolean("sec3", "d", fallback=(true, true)) == true
+    check ini.getlist("sec4", "d") == @["1", "2", "3", "4", "5"]
+    check ini.getlist("sec4", "e", fallback=(true, @["10"])) == @["10"]
 
 # vi: ft=nim:et:ts=4:fdm=marker
