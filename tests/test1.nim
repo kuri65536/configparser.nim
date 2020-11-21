@@ -5,6 +5,7 @@
 #
 # To run these tests, simply execute `nimble test`.
 import streams
+import tables
 import unittest
 
 import py_configparser
@@ -49,5 +50,27 @@ test "can omit comment 2 - sections":
     check ini.sections().contains("sec1")
     check ini.sections().contains("sec2")
     check ini.sections().contains("sec3")
+
+test "can check options 1":
+    var ini = ConfigParser()
+    ini.read(newStringStream("[sec1]  # comment\naaa = bbb\n" &
+                             "[sec2]# comment\nabc = bcd\n" &
+                             "[  sec3  ]   \nhij = lmn"))
+    check ini.has_option("sec1", "aaa") == true
+    check ini.has_option("sec1", "bbb") == false
+
+test "fallback test":
+    var ini = ConfigParser()
+    ini.read(newStringStream("test = default\n" &
+                             "[sec1]\ntest = input\n" &
+                             "[sec2]\nabc = input\n" &
+                             "[sec3]\nhij = input"))
+    var vars = newTable({"test": "vars"})
+    check ini.get("sec1", "test") == "input"
+    check ini.get("sec2", "abc") == "input"
+    check ini.get("sec2", "test") == "default"
+    check ini.get("sec2", "test", fallback = "fb") == "default"
+    check ini.get("sec2", "test", vars = vars) == "vars"
+    check ini.get("sec3", "none", fallback = "fb") == "fb"
 
 # vi: ft=nim:et:ts=4:fdm=marker

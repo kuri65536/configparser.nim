@@ -205,7 +205,6 @@ proc is_match(patterns: seq[string], n: int, line: string, f_space: bool  # {{{1
     if len(blks) < 1:
         return false
     for blk in blks:
-        echo "check " & blk & " => for " & line[n ..^ 1]
         var m = n + len(blk) - 1
         if m >= len(line):
             continue
@@ -261,12 +260,10 @@ proc parse_finish(c: var ConfigParser, line: string): ParseResult =  # {{{1
 
 proc parse_section_line(c: var ConfigParser, line: string): ParseResult =  # {{{1
     var left = line.strip(leading = true)
-    echo "section" & left
     if not left.startsWith("["):
         return ParseResult.in_empty
     left = left[1..^1]
     var right = remove_comment(left, space = true)
-    echo "section:right:" & right
     if not right.endswith("]"):
         return ParseResult.in_error_section
     right = right[0..^2]
@@ -274,7 +271,6 @@ proc parse_section_line(c: var ConfigParser, line: string): ParseResult =  # {{{
     var sec = right.strip()
     c.cur_section_name = sec
     if sec not_in c.sections():
-        echo "section:add:" & sec
         c.cur_section = newTable[string, string]()
         c.data.add(sec, c.cur_section)
     else:
@@ -820,14 +816,27 @@ proc delSectionKey*(dict: var Config, section, key: string) =
         dict[section].del(key)
 
 
-proc get*(self: ConfigParser, section, option: string): string =  # {{{1
+proc get*(self: ConfigParser, section, option: string, raw = false,  # {{{1
+          vars: TableRef[string, string] = nil, fallback: string = ""): string =
     var ret = ""
-    if not self.data.hasKey(section):
-        raise newException(KeyError, "does not have section" & section)
-    var tbl = self.data[section]
-    if not tbl.hasKey(option):
+    if not isNil(vars):  # vars is 1st priority.
+        if vars.hasKey(option):
+            return vars[option]
+
+    # 2nd search in section.
+    if self.data.hasKey(section):
+        var tbl = self.data[section]
+        if tbl.hasKey(option):
+            return tbl[option]
+
+    # 3rd search in default section.
+    var tbl = self.data[""]
+    if tbl.hasKey(option):
+        return tbl[option]
+
+    if len(fallback) < 1:  # finally go into fallback.
         raise newException(KeyError, "does not have option: " & option)
-    return tbl[option]
+    return fallback
 
 
 proc get*(self: SectionTable, option: string): string =  # {{{1

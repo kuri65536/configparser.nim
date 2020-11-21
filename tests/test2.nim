@@ -7,7 +7,7 @@ import py_configparser
 
 test "read file":  # covered in read()
             var parser = ConfigParser()
-            parser.read("test.ini")
+            parser.read("tests/test.ini")
             check parser.sections().contains("Foo Bar") == true
             check parser.has_option("Foo Bar", "foo") == true
             check parser.get("Foo Bar", "foo") == "newbar"
