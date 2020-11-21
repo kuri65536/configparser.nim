@@ -166,7 +166,8 @@ type
     cur_section_name: string
     cur_opt, cur_val: string
     data: TableRef[string, SectionTable]
-    inline_comment_prefixes*: seq[string]
+    comment_prefixes: seq[string]
+    inline_comment_prefixes: seq[string]
 
   SafeConfigParser* = ConfigParser
 
@@ -177,9 +178,11 @@ const
   SymChars = {'a'..'z', 'A'..'Z', '0'..'9', '_', '\x80'..'\xFF', '.', '/', '\\', '-'}
 
 
-proc initConfigParser*(): ConfigParser =  # {{{1
+proc initConfigParser*(comment_prefixes = @["#", ";"],  # {{{1
+                       inline_comment_prefixes = @[";"]): ConfigParser =
     return ConfigParser(
-        inline_comment_prefixes: @[";"])
+        comment_prefixes: comment_prefixes,
+        inline_comment_prefixes: inline_comment_prefixes)
 
 
 proc sections*(self: ConfigParser): seq[string] =  # {{{1
@@ -187,13 +190,13 @@ proc sections*(self: ConfigParser): seq[string] =  # {{{1
         result.add(i)
 
 
-proc is_comment(self: ConfigParser, n: int, line: string, f_space: bool  # {{{1
-                ): bool =  # {{{1
+proc is_match(patterns: seq[string], n: int, line: string, f_space: bool  # {{{1
+              ): bool =
     if not f_space:
         return false
     var blks: seq[string] = @[]
     var ch_cur = line[n]
-    for ch in self.inline_comment_prefixes:
+    for ch in patterns:
         if len(ch) > 1:
             blks.add(ch)
             continue
@@ -210,6 +213,23 @@ proc is_comment(self: ConfigParser, n: int, line: string, f_space: bool  # {{{1
         if blk_cur == blk:
             return true
     return false
+
+
+proc is_comment(self: ConfigParser, n: int, line: string, f_space: bool  # {{{1
+                ): bool =
+    is_match(self.inline_comment_prefixes, n, line, f_space)
+
+
+proc is_heading_comment(self: ConfigParser, line: string): int =  # {{{1
+    var whitespaces = " \t"
+    for i in 0..len(line) - 1:
+        var ch = line[i]
+        if whitespaces.contains(ch):
+            continue
+        if is_match(self.comment_prefixes, i, line, false):
+            return -2
+        return i
+    return -1
 
 
 proc remove_comment(src: string, space: bool): string =  # {{{1
@@ -264,15 +284,21 @@ proc parse_section_line(c: var ConfigParser, line: string): ParseResult =  # {{{
 
 proc parse_option_value(c: var ConfigParser, line: string  # {{{1
                         ): tuple[st: ParseResult, parsed: string] =
+    let splitter_opt_val = "=:"
     var f_opt = true
     var f_space = false
     var opt, val: string
+
+    var n_start = c.is_heading_comment(line)
+    if n_start < 0:
+        return (in_empty, "")
+
     for n in 0..len(line) - 1:
         var i = line[n]
         if f_opt:
             if c.is_comment(n, line, true):
                 break
-            if i == '=':
+            if splitter_opt_val.contains(i):
                 f_opt = false
                 opt = opt.strip()
                 continue

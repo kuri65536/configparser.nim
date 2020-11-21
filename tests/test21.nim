@@ -1,0 +1,24 @@
+import streams
+import unittest
+
+import py_configparser
+
+
+test "comment handlings":
+    var cf = initConfigParser(
+        comment_prefixes = @["#", ";"],
+        inline_comment_prefixes = @[";"])
+    cf.read_string("""
+        [Commented Bar]
+        baz=qwe ; a comment
+        foo: bar # not a comment!
+        # but this is a comment
+        ; another comment
+        quirk: this;is not a comment
+        ; a space must precede an inline comment
+        """)
+    check cf.get("Commented Bar", "foo") == "bar # not a comment!"
+    check cf.get("Commented Bar", "baz") == "qwe"
+    check cf.get("Commented Bar", "quirk") == "this;is not a comment"
+
+# vi: ft=nim:et:ts=4:fdm=marker

@@ -8,8 +8,8 @@ test "doesn't strip inline comment":
         delimiter occurs earlier without preceding space..
         ]#
 
-        var cfg = ConfigParser(
-                inline_comment_prefixes: @[";", "#", "//"])
+        var cfg = initConfigParser(
+                inline_comment_prefixes = @[";", "#", "//"])
         cfg.read_string("""
         [section]
         k1 = v1;still v1
