@@ -190,6 +190,12 @@ proc sections*(self: ConfigParser): seq[string] =  # {{{1
         result.add(i)
 
 
+proc remove_section*(self: var ConfigParser, section: string): void =  # {{{1
+    if not self.data.hasKey(section):
+        raise newException(KeyError, "section not found:" & section)
+    self.data.del(section)
+
+
 proc is_match(patterns: seq[string], n: int, line: string, f_space: bool  # {{{1
               ): bool =
     if not f_space:

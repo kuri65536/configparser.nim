@@ -5,6 +5,19 @@ import unittest
 import py_configparser
 
 
+test "can remove section":
+    var cf = ConfigParser()
+    cf.read("tests/test.ini")
+    cf.remove_section("Foo Bar")
+    check cf.has_section("Foo Bar") == false
+
+    try:
+        cf.remove_section("Foo Bar")
+        check false
+    except:
+        discard
+
+
 test "read file":  # covered in read()
             var parser = ConfigParser()
             parser.read("tests/test.ini")
