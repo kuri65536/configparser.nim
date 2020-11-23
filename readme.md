@@ -6,42 +6,41 @@ yet another configuration file parser like python
 
 ### class
 
-class                 |   | memo
+class             | impl. | memo
 ----------------------|---|-----
 RawConfigParser       |   |
-ConfigParser          |   |
+ConfigParser          | o |
 BasicInterpolation    |   |
 ExtendedInterpolation |   |
 
 
 ### method
 
-method / property         |     | memo
+method / property       | impl. | memo
 --------------------------|-----|------
-`BOOLEAN_STATES`          | no  |
-`optionxform(option)`     | no  |
-`SECTCRE`                 | no  |
-`defaults()`              |     |
-`sections()`              |     |
-`add_section()`           |     |
-`has_section()`           |     |
-`options()`               |     |
-`has_option()`            |     |
-`read()`                  |     |
+`BOOLEAN_STATES`          | no  | ...
+`optionxform(option)`     | no  | ...
+`SECTCRE`                 | no  | ...
+`defaults()`              |     | ...
+`sections()`              | o   | ...
+`add_section()`           | o   | ...
+`has_section()`           | o   | ...
+`options()`               | o   | ...
+`has_option()`            | o   | ...
+`read()`                  | o   | ...
 `read_file()`             |     |
-`read_string()`           |     |
+`read_string()`           | o   | ...
 `read_dict()`             |     |
-`get()`                   |     |
-`getint()`                |     |
-`getfloat()`              |     |
-`getboolean()`            |     |
+`get()`                   | o   | ...
+`getint()`                | o   | ...
+`getfloat()`              | o   | ...
+`getboolean()`            | o   | ...
 `items()`                 |     |
 `items()`                 |     |
-`set()`                   |     |
+`set()`                   | o   | ...
 `write()`                 |     |
 `remove_option()`         |     |
 `remove_section()`        |     |
-`optionxform()`           |     |
 `readfp()`                |     |
 `MAX_INTERPOLATION_DEPTH` |     |
 
@@ -54,7 +53,7 @@ RawConfigParser Objects
 
 ### Exceptions
 
-Exceptions              | converted | memo
+Exceptions                  | impl. | memo
 --------------------------------|---|-------
 Error                           | o | base of exceptions in this module.
 NoSectionError                  | o | ...
