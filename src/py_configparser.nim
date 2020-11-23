@@ -168,7 +168,9 @@ type
     cur_section: SectionTable
     cur_section_name: string
     cur_opt, cur_val: string
+
     data: TableRef[string, SectionTable]
+    tbl_defaults: SectionTable
     comment_prefixes: seq[string]
     inline_comment_prefixes: seq[string]
 
@@ -203,10 +205,24 @@ proc add_section*(self: var ConfigParser, section: string  # {{{1
     self.data.add(section, result)
 
 
+proc defaults*(self: ConfigParser): SectionTable =  # {{{1
+    return self.tbl_defaults
+
+
 proc remove_section*(self: var ConfigParser, section: string): void =  # {{{1
     if not self.data.hasKey(section):
         raise newException(NoSectionError, "section not found:" & section)
     self.data.del(section)
+
+
+proc remove_option*(self: var ConfigParser, section, option: string  # {{{1
+                    ): bool {.discardable.} =  # {{{1
+    if not self.data.hasKey(section):
+        raise newException(NoSectionError, "section not found:" & section)
+    if not self.data.hasKey(section):
+        return false
+    self.data[section].del(option)
+    return true
 
 
 proc is_match(patterns: seq[string], n: int, line: string, f_space: bool  # {{{1
