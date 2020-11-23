@@ -988,4 +988,21 @@ proc has_option*(self: ConfigParser, section, option: string): bool =  # {{{1
     return self.data[section].hasKey(option)
 
 
+proc items*(self: ConfigParser, section: string, raw: bool = false,   # {{{1
+            vars: TableRef[string, string] = nil
+            ): seq[tuple[option: string, value: string]] =
+    if not self.data.hasKey(section):
+        raise newException(NoSectionError, "section not found: " & section)
+    for k, v in self.data[section].pairs():
+        result.add((k, v))
+
+
+proc items*(self: ConfigParser, raw: bool = false,  # {{{1
+            vars: TableRef[string, string] = nil
+            ): seq[tuple[section: string, options: SectionTable]] =
+
+    for k, v in self.data.pairs():
+        result.add((k, v))
+
+
 # vi: ft=nim:et:ts=4:fdm=marker:nowrap
