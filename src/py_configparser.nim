@@ -374,7 +374,7 @@ proc read*(c: var ConfigParser, input: iterator(): string): void =  # {{{1
     ]#
 
 
-proc read*(c: var ConfigParser, input: Stream, filename = ""): void =  # {{{1
+proc read_file*(c: var ConfigParser, input: Stream, source = ""): void =  # {{{1
     iterator iter_lines(): string =
         var line = ""
         while input.readLine(line):
@@ -383,10 +383,10 @@ proc read*(c: var ConfigParser, input: Stream, filename = ""): void =  # {{{1
     c.read(iter_lines)
 
 
-proc read*(c: var ConfigParser, input: string) =  # {{{1
+proc read*(c: var ConfigParser, input: string, encoding: string = "") =  # {{{1
     var fp = newFileStream(input, fmRead)
     defer: fp.close
-    c.read(fp, input)
+    c.read_file(fp, input)
 
 
 proc read_string*(c: var ConfigParser, input: string) =  # {{{1
@@ -980,6 +980,20 @@ proc set*(self: var ConfigParser, section, option, value: string  # {{{1
         raise newException(DuplicateOptionError, "option duplicated: " &
                            section & "-" & option)
     tbl[option] = value
+
+
+proc read_dict*(c: var ConfigParser, src: Table[string, SectionTable],  # {{{1
+                source = ""): void =
+    for section, tbl in src.pairs():
+        if not c.has_section(section):
+            c.add_section(section)
+        for option, value in tbl.pairs():
+            c.set(section, option, value)
+
+
+proc read_dict*(c: var ConfigParser, src: ConfigParser,  # {{{1
+                source = ""): void =
+    c.read_dict(src, source)
 
 
 proc has_option*(self: ConfigParser, section, option: string): bool =  # {{{1
