@@ -128,10 +128,13 @@ type
     section,            ## a ``[section]`` has been parsed
     in_error_section,   ## an error occurred during parsing
 
-  DuplicateSectionError* = object of ValueError
-  DuplicateOptionError* = object of ValueError
-  ParsingError* = object of ValueError
+  Error = object of Exception
+  DuplicateSectionError* = object of Error
+  DuplicateOptionError* = object of Error
+  ParsingError* = object of Error
   MissingSectionHeaderError* = object of ValueError
+  NoSectionError* = object of Error
+  NoOptionError* = object of Error
 
   #[
   CfgEvent* = object of RootObj ## describes a parsing event
@@ -181,6 +184,7 @@ const
 proc initConfigParser*(comment_prefixes = @["#", ";"],  # {{{1
                        inline_comment_prefixes = @[";"]): ConfigParser =
     return ConfigParser(
+        data: newTable[string, SectionTable](),
         comment_prefixes: comment_prefixes,
         inline_comment_prefixes: inline_comment_prefixes)
 
@@ -190,9 +194,18 @@ proc sections*(self: ConfigParser): seq[string] =  # {{{1
         result.add(i)
 
 
+proc add_section*(self: var ConfigParser, section: string  # {{{1
+                  ): SectionTable {.discardable.} =  # {{{1
+    if self.data.hasKey(section):
+        raise newException(DuplicateSectionError,
+                           "section duplicated:" & section)
+    result = newTable[string, string]()
+    self.data.add(section, result)
+
+
 proc remove_section*(self: var ConfigParser, section: string): void =  # {{{1
     if not self.data.hasKey(section):
-        raise newException(KeyError, "section not found:" & section)
+        raise newException(NoSectionError, "section not found:" & section)
     self.data.del(section)
 
 
@@ -277,8 +290,7 @@ proc parse_section_line(c: var ConfigParser, line: string): ParseResult =  # {{{
     var sec = right.strip()
     c.cur_section_name = sec
     if sec not_in c.sections():
-        c.cur_section = newTable[string, string]()
-        c.data.add(sec, c.cur_section)
+        c.cur_section = c.add_section(sec)
     else:
         c.cur_section = c.data[sec]
     return ParseResult.section
@@ -841,14 +853,14 @@ proc get*(self: ConfigParser, section, option: string, raw = false,  # {{{1
         return tbl[option]
 
     if len(fallback) < 1:  # finally go into fallback.
-        raise newException(KeyError, "does not have option: " & option)
+        raise newException(NoOptionError, "does not have option: " & option)
     return fallback
 
 
 proc get*(self: SectionTable, option: string): string =  # {{{1
     var ret = ""
     if not self.hasKey(option):
-        raise newException(KeyError, "does not have option: " & option)
+        raise newException(NoOptionError, "does not have option: " & option)
     return self[option]
 
 
@@ -873,7 +885,7 @@ proc getfloat*(self: ConfigParser, section, option: string, raw = false,  # {{{1
         var src = self.get(section, option, raw, vars)
         var ret = parseFloat(src)
         return ret
-    except KeyError as e:
+    except NoOptionError as e:
         if fallback.en:
             return fallback.n
         raise e
@@ -891,7 +903,7 @@ proc getboolean_chk(src: string): bool =  # {{{1
     for pat in @["no", "off", "false", "0"]:
         if src == pat:
             return false
-    raise newException(ValueError, ":" & src)
+    raise newException(ParsingError, ":" & src)
 
 
 proc getboolean*(self: ConfigParser, section, option: string, raw = false,  # {{{1
@@ -900,7 +912,7 @@ proc getboolean*(self: ConfigParser, section, option: string, raw = false,  # {{
     try:
         var src = self.get(section, option, raw, vars)
         return getboolean_chk(src)
-    except KeyError as e:
+    except NoOptionError as e:
         if fallback.en:
             return fallback.n
         raise e
@@ -927,7 +939,7 @@ proc getlist*(self: ConfigParser, section, option: string, raw = false,  # {{{1
     try:
         var src = self.get(section, option, raw, vars)
         return getlist_parse(src)
-    except KeyError as e:
+    except NoOptionError as e:
         if fallback.en:
             return fallback.val
         raise e
@@ -940,7 +952,7 @@ proc getlist*(self: SectionTable, option: string): seq[string] =  # {{{1
 
 proc `[]`*(self: var ConfigParser, section: string): SectionTable =  # {{{1
     if not self.data.hasKey(section):
-        raise newException(ValueError, section & " not found")
+        raise newException(NoSectionError, section & " not found")
     return self.data[section]
 
 
@@ -950,11 +962,24 @@ proc `[]`*(self: SectionTable, option: string): string =  # {{{1
 
 proc options*(self: ConfigParser, section: string): seq[string] =  # {{{1
     var ret: seq[string] = @[]
+    for i in self.data[section].keys():
+        ret.add(i)
     return ret
 
 
 proc has_section*(self: ConfigParser, section: string): bool =  # {{{1
     return self.sections().contains(section)
+
+
+proc set*(self: var ConfigParser, section, option, value: string  # {{{1
+          ): void =
+    if not self.has_section(section):
+        raise newException(NoSectionError, "section not found: " & section)
+    var tbl = self.data[section]
+    if tbl.hasKey(option):
+        raise newException(DuplicateOptionError, "option duplicated: " &
+                           section & "-" & option)
+    tbl[option] = value
 
 
 proc has_option*(self: ConfigParser, section, option: string): bool =  # {{{1
