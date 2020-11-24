@@ -174,6 +174,7 @@ type
     comment_prefixes: seq[string]
     inline_comment_prefixes: seq[string]
     optionxform*: ref proc(src: string): string
+    BOOLEAN_STATES*: TableRef[string, bool]
 
   SafeConfigParser* = ConfigParser
 
@@ -924,11 +925,23 @@ proc getfloat*(self: SectionTable, option: string): float =  # {{{1
     return ret
 
 
-proc getboolean_chk(src: string): bool =  # {{{1
-    for pat in @["yes", "on", "true", "1"]:
+proc getboolean_chk(src: string, tbl: TableRef[string, bool]): bool =  # {{{1
+    var pats_true, pats_false: seq[string]
+    if isNil(tbl):
+        pats_true = @["yes", "on", "true", "1"]
+        pats_false = @["no", "off", "false", "0"]
+    else:
+        pats_true = @[]
+        pats_false = @[]
+        for k, v in tbl.pairs():
+            if v:
+                pats_true.add(k)
+            else:
+                pats_false.add(k)
+    for pat in pats_true:
         if src == pat:
             return true
-    for pat in @["no", "off", "false", "0"]:
+    for pat in pats_false:
         if src == pat:
             return false
     raise newException(ParsingError, ":" & src)
@@ -939,7 +952,7 @@ proc getboolean*(self: ConfigParser, section, option: string, raw = false,  # {{
                  fallback: tuple[en: bool, n: bool] = (false, false)): bool =
     try:
         var src = self.get(section, option, raw, vars)
-        return getboolean_chk(src)
+        return getboolean_chk(src, self.BOOLEAN_STATES)
     except NoOptionError as e:
         if fallback.en:
             return fallback.n
@@ -948,7 +961,7 @@ proc getboolean*(self: ConfigParser, section, option: string, raw = false,  # {{
 
 proc getboolean*(self: SectionTable, option: string): bool =  # {{{1
     var src = self[option]
-    return getboolean_chk(src)
+    return getboolean_chk(src, nil)
 
 
 proc getlist_parse*(src: string): seq[string] =  # {{{1
