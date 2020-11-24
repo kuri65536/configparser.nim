@@ -1,3 +1,4 @@
+import algorithm
 import streams
 import system
 import unittest
@@ -16,6 +17,34 @@ test "can remove section":
         check false
     except:
         discard
+
+
+test "can add section":
+    var cf = initConfigParser()
+    cf.add_section("A")
+    cf.add_section("a")
+    cf.add_section("B")
+    var seq = cf.sections()
+    seq.sort(system.cmp)
+    check seq[0] == "A"
+    check seq[1] == "B"
+    check seq[2] == "a"
+
+
+test "can add option":
+    var cf = initConfigParser()
+    cf.add_section("a")
+    cf.set("a", "B", "value")
+    check cf.options("a") == @["b"]  # B->b by optionxform.
+    check cf.get("a", "b") == "value"
+
+
+test "case sensitivity":
+    var cf = initConfigParser()
+    cf.add_section("A")
+    cf.set("A", "B", "value")  # recognize a and A, by previous test.
+    var opts = cf.options("A")    # and B->b by optionxform.
+    check opts.contains("B") == false
 
 
 test "read file":  # covered in read()

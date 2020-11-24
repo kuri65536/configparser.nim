@@ -173,6 +173,7 @@ type
     tbl_defaults: SectionTable
     comment_prefixes: seq[string]
     inline_comment_prefixes: seq[string]
+    optionxform*: ref proc(src: string): string
 
   SafeConfigParser* = ConfigParser
 
@@ -181,6 +182,13 @@ type
 
 const
   SymChars = {'a'..'z', 'A'..'Z', '0'..'9', '_', '\x80'..'\xFF', '.', '/', '\\', '-'}
+
+
+proc do_transform(self: ref proc(src: string): string, src: string): string =  # {{{1
+    result = src.toLower()
+    if isNil(self):
+        return result
+    return self[](src)
 
 
 proc initConfigParser*(comment_prefixes = @["#", ";"],  # {{{1
@@ -345,6 +353,8 @@ proc parse_option_value(c: var ConfigParser, line: string  # {{{1
             val &= $i
     if f_opt:
         return (opt_or_invalid, opt)
+
+    opt = c.optionxform.do_transform(opt)
     if c.cur_section.hasKey(opt):
         return (opt_and_dup, "")
     val = val.strip()
@@ -853,31 +863,33 @@ proc delSectionKey*(dict: var Config, section, key: string) =
 proc get*(self: ConfigParser, section, option: string, raw = false,  # {{{1
           vars: TableRef[string, string] = nil, fallback: string = ""): string =
     var ret = ""
+    var opt = self.optionxform.do_transform(option)
     if not isNil(vars):  # vars is 1st priority.
-        if vars.hasKey(option):
-            return vars[option]
+        if vars.hasKey(opt):
+            return vars[opt]
 
     # 2nd search in section.
     if self.data.hasKey(section):
         var tbl = self.data[section]
-        if tbl.hasKey(option):
-            return tbl[option]
+        if tbl.hasKey(opt):
+            return tbl[opt]
 
     # 3rd search in default section.
     var tbl = self.data[""]
-    if tbl.hasKey(option):
-        return tbl[option]
+    if tbl.hasKey(opt):
+        return tbl[opt]
 
     if len(fallback) < 1:  # finally go into fallback.
-        raise newException(NoOptionError, "does not have option: " & option)
+        raise newException(NoOptionError, "does not have option: " & opt)
     return fallback
 
 
 proc get*(self: SectionTable, option: string): string =  # {{{1
     var ret = ""
-    if not self.hasKey(option):
-        raise newException(NoOptionError, "does not have option: " & option)
-    return self[option]
+    var opt = do_transform(nil, option)
+    if not self.hasKey(opt):
+        raise newException(NoOptionError, "does not have option: " & opt)
+    return self[opt]
 
 
 proc getint*(self: ConfigParser, section, option: string, raw = false,  # {{{1
@@ -992,10 +1004,11 @@ proc set*(self: var ConfigParser, section, option, value: string  # {{{1
     if not self.has_section(section):
         raise newException(NoSectionError, "section not found: " & section)
     var tbl = self.data[section]
-    if tbl.hasKey(option):
+    var opt = self.optionxform.do_transform(option)
+    if tbl.hasKey(opt):
         raise newException(DuplicateOptionError, "option duplicated: " &
-                           section & "-" & option)
-    tbl[option] = value
+                           section & "-" & opt)
+    tbl[opt] = value
 
 
 proc read_dict*(c: var ConfigParser, src: Table[string, SectionTable],  # {{{1

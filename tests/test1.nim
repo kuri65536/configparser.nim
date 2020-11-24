@@ -13,25 +13,25 @@ import py_configparser
 
 test "can basic parse":
     var ini = ConfigParser()
-    ini.read(newStringStream("test = test"))
+    ini.read_string("test = test")
     check ini.get("", "test") == "test"
 
 test "can basic parse - 2":
     var ini = ConfigParser()
-    ini.read(newStringStream("test = test\ntest2 = aaa"))
+    ini.read_file(newStringStream("test = test\ntest2 = aaa"))
     check ini.get("", "test2") == "aaa"
 
 test "can basic parse - 3":
     var ini = ConfigParser()
-    ini.read(newStringStream("test = test\ntest2 = aaa\ntest3 = abc"))
+    ini.read_string("test = test\ntest2 = aaa\ntest3 = abc")
     check ini.get("", "test3") == "abc"
 
 test "can basic parse - sections":
     var ini = ConfigParser()
-    ini.read(newStringStream("test = test\n" &
+    ini.read_string("test = test\n" &
                              "[sec1]\naaa = bbb\n" &
                              "[sec2]\nabc = bcd\n" &
-                             "[sec3]\nhij = lmn"))
+                             "[sec3]\nhij = lmn")
     check ini.get("", "test") == "test"
     check ini.get("sec1", "aaa") == "bbb"
     check ini.get("sec2", "abc") == "bcd"
@@ -39,32 +39,32 @@ test "can basic parse - sections":
 
 test "can omit comment 1":
     var ini = initConfigParser()
-    ini.read(newStringStream("test = test  ; test comment"))
+    ini.read_string("test = test  ; test comment")
     check ini.get("", "test") == "test"
 
 test "can omit comment 2 - sections":
     var ini = ConfigParser()
-    ini.read(newStringStream("[sec1]  # comment\naaa = bbb\n" &
+    ini.read_string("[sec1]  # comment\naaa = bbb\n" &
                              "[sec2]# comment\nabc = bcd\n" &
-                             "[  sec3  ]   \nhij = lmn"))
+                             "[  sec3  ]   \nhij = lmn")
     check ini.sections().contains("sec1")
     check ini.sections().contains("sec2")
     check ini.sections().contains("sec3")
 
 test "can check options 1":
     var ini = ConfigParser()
-    ini.read(newStringStream("[sec1]  # comment\naaa = bbb\n" &
+    ini.read_string("[sec1]  # comment\naaa = bbb\n" &
                              "[sec2]# comment\nabc = bcd\n" &
-                             "[  sec3  ]   \nhij = lmn"))
+                             "[  sec3  ]   \nhij = lmn")
     check ini.has_option("sec1", "aaa") == true
     check ini.has_option("sec1", "bbb") == false
 
 test "fallback test 1":
     var ini = ConfigParser()
-    ini.read(newStringStream("test = default\n" &
+    ini.read_string("test = default\n" &
                              "[sec1]\ntest = input\n" &
                              "[sec2]\nabc = input\n" &
-                             "[sec3]\nhij = input"))
+                             "[sec3]\nhij = input")
     var vars = newTable({"test": "vars"})
     check ini.get("sec1", "test") == "input"
     check ini.get("sec2", "abc") == "input"
@@ -75,10 +75,10 @@ test "fallback test 1":
 
 test "fallback test 2":
     var ini = ConfigParser()
-    ini.read(newStringStream("[sec1]\na = 1\n" &
-                             "[sec2]\nb = 2.5\n" &
-                             "[sec3]\nc = true\n" &
-                             "[sec4]\nd = 1 2 3 4 5"))
+    ini.read_file(newStringStream("[sec1]\na = 1\n" &
+                                  "[sec2]\nb = 2.5\n" &
+                                  "[sec3]\nc = true\n" &
+                                  "[sec4]\nd = 1 2 3 4 5"))
     check ini.getint("sec1", "a") == 1
     check ini.getint("sec1", "b", fallback=(true, 2)) == 2
     check ini.getfloat("sec2", "b") == 2.5
