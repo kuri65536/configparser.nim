@@ -47,6 +47,43 @@ test "case sensitivity":
     check opts.contains("B") == false
 
 
+proc config_for_interpolate_test(): ConfigParser =  # {{{1
+    result = initConfigParser(
+        interpolation = initBasicInterpolation())
+    result.read_string("""
+        [Foo]
+        bar = something %(with1)s interpolation (1 step)
+        bar9 = something %(with9)s lots of interpolation (9 steps)
+        bar10 = something %(with10)s lots of interpolation (10 steps)
+        bar11 = something %(with11)s lots of interpolation (11 steps)
+        with11 = %(with10)s
+        with10 = %(with9)s
+        with9 = %(with8)s
+        with8 = %(With7)s
+        with7 = %(WITH6)s
+        with6 = %(with5)s
+        With5 = %(with4)s
+        WITH4 = %(with3)s
+        with3 = %(with2)s
+        with2 = %(with1)s
+        with1 = with
+
+        [Mutual Recursion]
+        foo = %(bar)s
+        bar = %(foo)s
+
+        [Interpolation Error]
+        # no definition for 'reference'
+        name = %(reference)s.format(equals=self.delimiters[0])
+        """)
+
+
+test "interpolation - basic":
+    var cf = config_for_interpolate_test()
+    check cf.get("Foo", "bar") == "something withs interpolation (1 step)"
+
+
+#[
 test "read file":  # covered in read()
             var parser = ConfigParser()
             parser.read("tests/test.ini")
@@ -54,7 +91,7 @@ test "read file":  # covered in read()
             check parser.has_option("Foo Bar", "foo") == true
             check parser.get("Foo Bar", "foo") == "newbar"
 
-#[
+
 test "read iterable":
         var parser = ConfigParser()
         var lines = ("[Foo Bar]",

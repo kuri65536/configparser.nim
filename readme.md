@@ -8,7 +8,7 @@ yet another configuration file parser like python
 
 class             | impl. | memo
 ----------------------|---|-----
-RawConfigParser       |   |
+RawConfigParser       | x | no-plan to implement.
 ConfigParser          | o |
 BasicInterpolation    |   |
 ExtendedInterpolation |   |

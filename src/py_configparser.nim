@@ -163,6 +163,12 @@ type
 
   SectionTable* = TableRef[string, string]
 
+  Interpolation* = ref object of RootObj
+    discard
+
+  BasicInterpolation* = ref object of Interpolation
+    defaults_additional: SectionTable
+
   ConfigParser* = ref object of RootObj
     cur_state: ParseResult
     cur_section: SectionTable
@@ -174,7 +180,9 @@ type
     comment_prefixes: seq[string]
     inline_comment_prefixes: seq[string]
     optionxform*: ref proc(src: string): string
+    interpolation: Interpolation
     BOOLEAN_STATES*: TableRef[string, bool]
+    MAX_INTERPOLATION_DEPTH*: int
 
   SafeConfigParser* = ConfigParser
 
@@ -185,6 +193,11 @@ const
   SymChars = {'a'..'z', 'A'..'Z', '0'..'9', '_', '\x80'..'\xFF', '.', '/', '\\', '-'}
 
 
+method run(self: Interpolation, cfg: ConfigParser,  # {{{1
+           section, value: string, level = 0): string {.base.} =
+    return value
+
+
 proc do_transform(self: ref proc(src: string): string, src: string): string =  # {{{1
     result = src.toLower()
     if isNil(self):
@@ -192,12 +205,19 @@ proc do_transform(self: ref proc(src: string): string, src: string): string =  #
     return self[](src)
 
 
+proc initBasicInterpolation*(): BasicInterpolation =  # {{{1
+    result = BasicInterpolation()
+
+
 proc initConfigParser*(comment_prefixes = @["#", ";"],  # {{{1
-                       inline_comment_prefixes = @[";"]): ConfigParser =
+                       inline_comment_prefixes = @[";"],
+                       interpolation: Interpolation = nil): ConfigParser =
     return ConfigParser(
         data: newTable[string, SectionTable](),
         comment_prefixes: comment_prefixes,
-        inline_comment_prefixes: inline_comment_prefixes)
+        inline_comment_prefixes: inline_comment_prefixes,
+        MAX_INTERPOLATION_DEPTH: 5,
+        interpolation: interpolation)
 
 
 proc sections*(self: ConfigParser): seq[string] =  # {{{1
@@ -861,28 +881,40 @@ proc delSectionKey*(dict: var Config, section, key: string) =
         dict[section].del(key)
 
 
+proc do_interpolation(self: ConfigParser, section, value: string  # {{{1
+                      ): string =
+    if isNil(self):
+        return value
+    if isNil(self.interpolation):
+        return value
+    return self.interpolation.run(self, section, value)
+
+
 proc get*(self: ConfigParser, section, option: string, raw = false,  # {{{1
           vars: TableRef[string, string] = nil, fallback: string = ""): string =
     var ret = ""
     var opt = self.optionxform.do_transform(option)
     if not isNil(vars):  # vars is 1st priority.
         if vars.hasKey(opt):
-            return vars[opt]
+            ret = vars[opt]
+            return do_interpolation(self, section, ret)
 
     # 2nd search in section.
     if self.data.hasKey(section):
         var tbl = self.data[section]
         if tbl.hasKey(opt):
-            return tbl[opt]
+            ret = tbl[opt]
+            return do_interpolation(self, section, ret)
 
     # 3rd search in default section.
     var tbl = self.data[""]
     if tbl.hasKey(opt):
-        return tbl[opt]
+        ret = tbl[opt]
+        return do_interpolation(self, section, ret)
 
     if len(fallback) < 1:  # finally go into fallback.
         raise newException(NoOptionError, "does not have option: " & opt)
-    return fallback
+    return do_interpolation(self, section, fallback)
 
 
 proc get*(self: SectionTable, option: string): string =  # {{{1
@@ -890,7 +922,9 @@ proc get*(self: SectionTable, option: string): string =  # {{{1
     var opt = do_transform(nil, option)
     if not self.hasKey(opt):
         raise newException(NoOptionError, "does not have option: " & opt)
-    return self[opt]
+    ret = self[opt]
+    # ret = do_interpolation(nil, "", ret)  # not meaningful.
+    return ret
 
 
 proc getint*(self: ConfigParser, section, option: string, raw = false,  # {{{1
@@ -1042,6 +1076,72 @@ proc has_option*(self: ConfigParser, section, option: string): bool =  # {{{1
     if not self.data.hasKey(section):
         return false
     return self.data[section].hasKey(option)
+
+
+proc resolve_interpolation(self: BasicInterpolation, cfg: ConfigParser,  # {{{1
+                           section, value: string, level = 0): string =
+    if level >= cfg.MAX_INTERPOLATION_DEPTH:
+        return value
+
+    # search value from section, defaults, interpolate's defaults
+    var ret = value
+    if cfg.has_option(section, ret):
+        ret = cfg.get(section, ret)
+    elif cfg.defaults().hasKey(ret):
+        ret = cfg.defaults().get(ret)
+    elif isNil(self.defaults_additional):
+        discard
+    elif self.defaults_additional.hasKey(ret):
+        ret = self.defaults_additional[ret]
+
+    if ret.contains('%'):
+        return self.run(cfg, section, ret, level + 1)
+    return ret
+
+
+method run(self: BasicInterpolation, cfg: ConfigParser,  # {{{1
+           section, value: string, level = 0): string =
+    proc run_in_else(ch: char, dst: var seq[tuple[s: string, f: bool]]): bool =
+        case ch:
+        of '%':
+            return true
+        else:
+            dst[^ 1].s &= $ch
+        return false
+
+    proc run_after_prefix(ch: char, dst: var seq[tuple[s: string, f: bool]]
+                          ): bool =
+        case ch:
+        of '(':
+            dst.add((s: "", f: true))
+        else:  # maybe `of '%':`
+            dst[^ 1].s &= $ch
+        return false
+
+    proc run_in_var(ch: char, dst: var seq[tuple[s: string, f: bool]]): void =
+        case ch:
+        of ')':
+            dst.add((s: "", f: false))
+        else:
+            dst[^ 1].s &= $ch
+
+    var ret: seq[tuple[s: string, f: bool]] = @[("", false)]
+    var f_prefix = false
+    for i in 0..len(value) - 1:
+        var ch = value[i]
+        if f_prefix:
+            f_prefix = run_after_prefix(ch, ret)
+        elif ret[^ 1].f:
+            run_in_var(ch, ret)
+        else:
+            f_prefix = run_in_else(ch, ret)
+
+    result = ""
+    for part in ret:
+        if part.f:
+            result &= self.resolve_interpolation(cfg, section, part.s)
+        else:
+            result &= part.s
 
 
 proc items*(self: ConfigParser, section: string, raw: bool = false,   # {{{1
