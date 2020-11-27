@@ -74,13 +74,48 @@ proc config_for_interpolate_test(): ConfigParser =  # {{{1
 
         [Interpolation Error]
         # no definition for 'reference'
-        name = %(reference)s.format(equals=self.delimiters[0])
+        name = %(reference)
         """)
 
 
-test "interpolation - basic":
+test "interpolation - basic - step1,3-7":
     var cf = config_for_interpolate_test()
     check cf.get("Foo", "bar") == "something withs interpolation (1 step)"
+    check cf.get("Foo", "with3") == "withss"
+    check cf.get("Foo", "with4") == "withsss"
+    check cf.get("Foo", "with5") == "withssss"
+    check cf.get("Foo", "with6") == "withsssss"
+    check cf.get("Foo", "with7") == "withssssss"
+
+
+test "interpolation - basic - step9":
+    var cf = config_for_interpolate_test()
+    check(cf.get("Foo", "bar9") ==
+          "something withsssssssss lots of interpolation (9 steps)")
+
+
+test "interpolation - basic - step10":
+    var cf = config_for_interpolate_test()
+    check(cf.get("Foo", "bar10") ==
+          "something withssssssssss lots of interpolation (10 steps)")
+
+
+test "interpolation - too deep":
+    var cf = config_for_interpolate_test()
+    try:
+        discard cf.get("Foo", "bar11")
+        check false
+    except InterpolationDepthError:
+        discard
+
+
+test "interpolation - missing value":
+    var cf = config_for_interpolate_test()
+    try:
+        discard cf.get("Interpolation Error", "name")
+        check false
+    except InterpolationMissingOptionError:
+        discard
 
 
 #[
