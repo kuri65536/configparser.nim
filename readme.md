@@ -2,7 +2,11 @@
 yet another configuration file parser like python
 
 
-## status
+## 
+
+
+
+## implement status
 
 ### class
 
@@ -10,7 +14,7 @@ class             | impl. | memo
 ----------------------|---|-----
 RawConfigParser       | x | no-plan to implement.
 ConfigParser          | o |
-BasicInterpolation    |   |
+BasicInterpolation    | o |
 ExtendedInterpolation |   |
 
 
@@ -41,13 +45,8 @@ method / property       | impl. | memo
 `write()`                 |     |
 `remove_option()`         | o   | ...
 `remove_section()`        | o   | ...
-`MAX_INTERPOLATION_DEPTH` |     |
+`MAX_INTERPOLATION_DEPTH` | o   | ...
 
-
-RawConfigParser Objects
-
-    add_section(section)
-    set(section, option, value)
 
 
 ### Exceptions
