@@ -89,4 +89,39 @@ test "fallback test 2":
     check ini.getlist("sec4", "d") == @["1", "2", "3", "4", "5"]
     check ini.getlist("sec4", "e", fallback=(true, @["10"])) == @["10"]
 
+
+proc cfg_multiline(): ConfigParser =  # {{{1
+    var cfg = initConfigParser()
+    cfg.read_string("""[
+        [Long Line]
+        foo = this line is much, much longer than my editor
+           likes it.
+        []
+        bar= another very
+         long line
+        [Long Line - With Comments!]
+        test = we        ; can\n"
+               also      ; place\n"
+               comments  ; in\n"
+               multiline ; values"
+        """)
+    return cfg
+
+
+test "multiline - 1":
+    var cfg = cfg_multiline()
+    check cfg.get("Long Line", "foo") ==
+        "this line is much, much longer than my editor likes it."
+
+test "multiline - 2":
+    var cfg = cfg_multiline()
+    check cfg.get("Long Line", "bar") == "another very long line"
+
+test "multiline - 3":
+    var cfg = cfg_multiline()
+    check cfg.get("Long Line - With Comments!", "test") ==
+                  "we also comments multiline"
+
+
+# end of file {{{1
 # vi: ft=nim:et:ts=4:fdm=marker

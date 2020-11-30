@@ -125,7 +125,6 @@ type  # {{{1
     cur_state: ParseResult
     cur_section: SectionTable
     cur_section_name: string
-    cur_opt, cur_val: string
 
     data: TableRef[string, SectionTable]
     tbl_defaults: SectionTable
@@ -235,7 +234,7 @@ proc is_heading_comment(self: ConfigParser, line: string): int =  # {{{1
         var ch = line[i]
         if whitespaces.contains(ch):
             continue
-        if is_match(self.comment_prefixes, i, line, false):
+        if is_match(self.comment_prefixes, i, line, true):
             return -2
         return i
     return -1
@@ -288,7 +287,7 @@ proc parse_section_line(c: var ConfigParser, line: string): ParseResult =  # {{{
 
 
 proc parse_option_value(c: var ConfigParser, line: string  # {{{1
-                        ): tuple[st: ParseResult, parsed: string] =
+                        ): tuple[st: ParseResult, opt, val: string] =
     let splitter_opt_val = "=:"
     var f_opt = true
     var f_space = false
@@ -296,9 +295,9 @@ proc parse_option_value(c: var ConfigParser, line: string  # {{{1
 
     var n_start = c.is_heading_comment(line)
     if n_start < 0:
-        return (in_empty, "")
+        return (in_empty, "", "")
 
-    for n in 0..len(line) - 1:
+    for n in n_start..len(line) - 1:
         var i = line[n]
         if f_opt:
             if c.is_comment(n, line, true):
@@ -310,7 +309,7 @@ proc parse_option_value(c: var ConfigParser, line: string  # {{{1
             if i == '[':
                 discard c.parse_finish(opt)
                 var ret = c.parse_section_line(line[n..^1])
-                return (ret, "")
+                return (ret, "", "")
             opt &= $i
         else:
             var f = f_space
@@ -319,14 +318,13 @@ proc parse_option_value(c: var ConfigParser, line: string  # {{{1
                 break
             val &= $i
     if f_opt:
-        return (opt_or_invalid, opt)
+        return (opt_or_invalid, "", opt)
 
     opt = c.optionxform.do_transform(opt)
     if c.cur_section.hasKey(opt):
-        return (opt_and_dup, "")
+        return (opt_and_dup, opt, val)
     val = val.strip()
-    c.cur_section.add(opt, val)
-    return (opt_and_val, val)
+    return (opt_and_val, opt, val)
 
 
 proc read*(c: var ConfigParser, input: iterator(): string): void =  # {{{1
@@ -335,18 +333,24 @@ proc read*(c: var ConfigParser, input: iterator(): string): void =  # {{{1
     c.cur_section_name = ""
     c.data.add("", c.cur_section)
 
-    var line: string
+    var line, cur_opt, cur_val: string
     var cur = ParseResult.in_empty
     for line in input():
-        var (st, parsed) = c.parse_option_value(line)
+        var (st, opt, val) = c.parse_option_value(line)
         case st:
         of opt_and_val:
-            cur = ParseResult.in_val
+            (cur, cur_opt, cur_val) = (ParseResult.in_val, opt, val)
+            c.cur_section.add(opt, val)
         of opt_and_dup:
             cur = ParseResult.in_empty
         of opt_or_invalid:
-            if cur == in_val:
-                c.cur_val &= parsed
+            val = val.strip()
+            if cur != ParseResult.in_val:
+                discard
+            elif len(val) > 0 and c.cur_section.hasKey(cur_opt):
+                c.cur_section[cur_opt] &= " " & val
+            else:
+                cur = ParseResult.in_empty
         else:
             discard
 
