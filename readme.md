@@ -1,8 +1,9 @@
-# `py_configparser`
-yet another configuration file parser like python
+`py_configparser`
+===============================================================================
+yet another configuration file parser like python behaviors.
 
 
-## 
+## install
 
 
 
@@ -15,7 +16,7 @@ class             | impl. | memo
 RawConfigParser       | x | no-plan to implement.
 ConfigParser          | o |
 BasicInterpolation    | o |
-ExtendedInterpolation |   |
+ExtendedInterpolation | o |
 
 
 ### method
@@ -23,8 +24,9 @@ ExtendedInterpolation |   |
 method / property       | impl. | memo
 --------------------------|-----|------
 `BOOLEAN_STATES`          | o   | ...
+`MAX_INTERPOLATION_DEPTH` | o   | ...
 `optionxform(option)`     | o   | affects on every read, get, or set operation.
-`SECTCRE`                 | no  | ...
+`SECTCRE`                 |     | no-plan to implement. (hard coded in this module)
 `defaults()`              | o   | ...
 `sections()`              | o   | ...
 `add_section()`           | o   | ...
@@ -45,7 +47,6 @@ method / property       | impl. | memo
 `write()`                 |     |
 `remove_option()`         | o   | ...
 `remove_section()`        | o   | ...
-`MAX_INTERPOLATION_DEPTH` | o   | ...
 
 
 

@@ -4,7 +4,7 @@ import unittest
 import py_configparser
 
 
-test "comment handlings":
+test "comment handlings":  # {{{1
     var cf = initConfigParser(
         comment_prefixes = @["#", ";"],
         inline_comment_prefixes = @[";"])
@@ -21,4 +21,6 @@ test "comment handlings":
     check cf.get("Commented Bar", "baz") == "qwe"
     check cf.get("Commented Bar", "quirk") == "this;is not a comment"
 
+
+# end of file {{{1
 # vi: ft=nim:et:ts=4:fdm=marker

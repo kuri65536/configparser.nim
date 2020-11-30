@@ -118,6 +118,88 @@ test "interpolation - missing value":
         discard
 
 
+proc config_for_extended_interpolate_test(): ConfigParser =  # {{{1
+    result = initConfigParser(
+        interpolation = initExtendedInterpolation())
+    result.read_string("""
+        [Foo]
+        bar = something ${with1}s interpolation (1 step)
+        bar9 = something ${with9}s lots of interpolation (9 steps)
+        bar10 = something ${with10}s lots of interpolation (10 steps)
+        bar11 = something ${with11}s lots of interpolation (11 steps)
+        with11 = ${with10}s
+        with10 = ${with9}s
+        with9 = ${with8}s
+        with8 = ${With7}s
+        with7 = ${WITH6}s
+        with6 = ${Foo2:with5}s
+        WITH4 = ${with3}s
+        with3 = ${Foo2:with2}s
+        with1 = with
+
+        [Foo2]
+        with2 = ${Foo:with1}s
+        With5 = ${Foo:with4}s
+
+        [Mutual Recursion]
+        foo = ${bar}s
+        bar = ${foo}s
+
+        [Interpolation Error]
+        # no definition for 'reference'
+        name = %(reference)
+        """)
+
+
+test "extended interpolation - basic - step1,3-7":
+    var cf = config_for_extended_interpolate_test()
+    check cf.get("Foo", "bar") == "something withs interpolation (1 step)"
+    check cf.get("Foo", "with3") == "withss"
+    check cf.get("Foo", "with4") == "withsss"
+    check cf.get("Foo2", "with5") == "withssss"
+    check cf.get("Foo", "with6") == "withsssss"
+    check cf.get("Foo", "with7") == "withssssss"
+
+
+test "extended interpolation - basic - step9":
+    var cf = config_for_extended_interpolate_test()
+    check(cf.get("Foo", "bar9") ==
+          "something withsssssssss lots of interpolation (9 steps)")
+
+
+test "extended interpolation - basic - step10":
+    var cf = config_for_extended_interpolate_test()
+    check(cf.get("Foo", "bar10") ==
+          "something withssssssssss lots of interpolation (10 steps)")
+
+
+test "extended interpolation - too deep":
+    var cf = config_for_interpolate_test()
+    try:
+        discard cf.get("Foo", "bar11")
+        check false
+    except InterpolationDepthError:
+        discard
+
+
+test "extended interpolation - mutual recursion":
+    var cf = config_for_interpolate_test()
+    try:
+        discard cf.get("Mutual Recursion", "foo")
+        check false
+    except InterpolationDepthError:
+        discard
+
+
+test "extended interpolation - missing value":
+    var cf = config_for_interpolate_test()
+    try:
+        discard cf.get("Interpolation Error", "name")
+        check false
+    except InterpolationMissingOptionError:
+        discard
+
+
 #[
 test "read file":  # covered in read()
             var parser = ConfigParser()

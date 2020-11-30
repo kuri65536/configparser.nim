@@ -121,6 +121,9 @@ type  # {{{1
   BasicInterpolation* = ref object of Interpolation
     defaults_additional: SectionTable
 
+  ExtendedInterpolation* = ref object of Interpolation
+    defaults_additional: SectionTable
+
   ConfigParser* = ref object of RootObj
     cur_state: ParseResult
     cur_section: SectionTable
@@ -152,6 +155,10 @@ proc do_transform(self: ref proc(src: string): string, src: string): string =  #
 
 proc initBasicInterpolation*(): BasicInterpolation =  # {{{1
     result = BasicInterpolation()
+
+
+proc initExtendedInterpolation*(): ExtendedInterpolation =  # {{{1
+    result = ExtendedInterpolation()
 
 
 proc initConfigParser*(comment_prefixes = @["#", ";"],  # {{{1
@@ -674,6 +681,78 @@ method run(self: BasicInterpolation, cfg: ConfigParser,  # {{{1
     proc run_in_var(ch: char, dst: var seq[tuple[s: string, f: bool]]): void =
         case ch:
         of ')':
+            dst.add((s: "", f: false))
+        else:
+            dst[^ 1].s &= $ch
+
+    var ret: seq[tuple[s: string, f: bool]] = @[("", false)]
+    var f_prefix = false
+    for i in 0..len(value) - 1:
+        var ch = value[i]
+        if f_prefix:
+            f_prefix = run_after_prefix(ch, ret)
+        elif ret[^ 1].f:
+            run_in_var(ch, ret)
+        else:
+            f_prefix = run_in_else(ch, ret)
+
+    result = ""
+    for part in ret:
+        if part.f:
+            result &= self.resolve_interpolation(cfg, section, part.s, level)
+        else:
+            result &= part.s
+
+
+proc resolve_interpolation(self: ExtendedInterpolation, cfg: ConfigParser,  # {{{1
+                           section, value: string, level: int): string =
+    if level > cfg.MAX_INTERPOLATION_DEPTH:
+        raise newException(InterpolationDepthError, "for " & value)
+
+    # search value from section, defaults, interpolate's defaults
+    var (section_name, ret) = (section, value)
+    if value.contains(':'):
+        var seq = value.split(':')
+        section_name = seq[0]
+        ret = join(seq[1..^1], ":")
+
+    if cfg.has_option(section_name, ret):
+        var f_dmy: bool
+        (ret, f_dmy) = cfg.get_with_level(section_name, ret, level + 1)
+    elif not isNil(self.defaults_additional) and
+             self.defaults_additional.hasKey(ret):
+        ret = self.defaults_additional[ret]
+        if ret.contains('$'):
+            return self.run(cfg, section_name, ret, level + 1)
+    else:
+        raise newException(InterpolationMissingOptionError,
+                           "not found:" & value)
+
+    return ret
+
+
+method run(self: ExtendedInterpolation, cfg: ConfigParser,  # {{{1
+           section, value: string, level: int): string =
+    proc run_in_else(ch: char, dst: var seq[tuple[s: string, f: bool]]): bool =
+        case ch:
+        of '$':
+            return true
+        else:
+            dst[^ 1].s &= $ch
+        return false
+
+    proc run_after_prefix(ch: char, dst: var seq[tuple[s: string, f: bool]]
+                          ): bool =
+        case ch:
+        of '{':
+            dst.add((s: "", f: true))
+        else:  # maybe `of '%':`
+            dst[^ 1].s &= $ch
+        return false
+
+    proc run_in_var(ch: char, dst: var seq[tuple[s: string, f: bool]]): void =
+        case ch:
+        of '}':
             dst.add((s: "", f: false))
         else:
             dst[^ 1].s &= $ch
