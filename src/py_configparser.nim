@@ -335,6 +335,9 @@ proc parse_option_value(c: var ConfigParser, line: string  # {{{1
 
 
 proc read*(c: var ConfigParser, input: iterator(): string): void =  # {{{1
+    if isNil(c.tbl_defaults):
+        c.tbl_defaults = newTable[string, string]()
+
     c.data = newTable[string, SectionTable]()
     c.cur_section = newTable[string, string]()
     c.cur_section_name = ""
@@ -475,7 +478,8 @@ proc get*(self: ConfigParser, section, option: string, raw = false,  # {{{1
     return do_interpolation(self, section, fallback, 1)
 
 
-proc get*(self: SectionTable, option: string): string =  # {{{1
+proc get*(self: SectionTable, option: string,  # {{{1
+          vars: TableRef[string, string] = nil): string =  # {{{1
     var ret = ""
     var opt = do_transform(nil, option)
     if not self.hasKey(opt):
@@ -485,11 +489,27 @@ proc get*(self: SectionTable, option: string): string =  # {{{1
     return ret
 
 
+proc get*(self: SectionTable, option, fallback: string): string =  # {{{1
+    var ret = ""
+    var opt = do_transform(nil, option)
+    if not self.hasKey(opt):
+        return fallback
+    ret = self[opt]
+    # ret = do_interpolation(nil, "", ret)  # not meaningful.
+    return ret
+
+
 proc getint*(self: ConfigParser, section, option: string, raw = false,  # {{{1
-             vars: TableRef[string, string] = nil,
-             fallback: tuple[en: bool, n: int] = (false, 0)): int =
-    var src = if fallback.en: self.get(section, option, raw, vars, $fallback.n)
-              else:           self.get(section, option, raw, vars)
+             vars: TableRef[string, string] = nil): int =
+    var src = self.get(section, option, raw, vars)
+    var ret = parseInt(src)
+    return ret
+
+
+proc getint*(self: ConfigParser, section, option: string,  # {{{1
+             fallback: int, raw = false,
+             vars: TableRef[string, string] = nil): int =
+    var src = self.get(section, option, raw, vars, $fallback)
     var ret = parseInt(src)
     return ret
 
@@ -499,20 +519,42 @@ proc getint*(self: SectionTable, option: string): int =  # {{{1
     return ret
 
 
+proc getint*(self: SectionTable, option: string,  # {{{1
+             fallback: int): int =  # {{{1
+    if not self.hasKey(option):
+        return fallback
+    var ret = parseInt(self[option])
+    return ret
+
+
 proc getfloat*(self: ConfigParser, section, option: string, raw = false,  # {{{1
-               vars: TableRef[string, string] = nil,
-               fallback: tuple[en: bool, n: float] = (false, 0.0)): float =
+               vars: TableRef[string, string] = nil): float =
+    var src = self.get(section, option, raw, vars)
+    var ret = parseFloat(src)
+    return ret
+
+
+proc getfloat*(self: ConfigParser, section, option: string,  # {{{1
+               fallback: float, raw = false,
+               vars: TableRef[string, string] = nil): float =
     try:
         var src = self.get(section, option, raw, vars)
         var ret = parseFloat(src)
         return ret
     except NoOptionError as e:
-        if fallback.en:
-            return fallback.n
-        raise e
+        discard
+    return fallback
 
 
 proc getfloat*(self: SectionTable, option: string): float =  # {{{1
+    var ret = parseFloat(self[option])
+    return ret
+
+
+proc getfloat*(self: SectionTable, option: string,  # {{{1
+               fallback: float): float =
+    if not self.hasKey(option):
+        return fallback
     var ret = parseFloat(self[option])
     return ret
 
@@ -540,20 +582,37 @@ proc getboolean_chk(src: string, tbl: TableRef[string, bool]): bool =  # {{{1
 
 
 proc getboolean*(self: ConfigParser, section, option: string, raw = false,  # {{{1
-                 vars: TableRef[string, string] = nil,
-                 fallback: tuple[en: bool, n: bool] = (false, false)): bool =
+                 vars: TableRef[string, string] = nil): bool =
+    var src = self.get(section, option, raw, vars)
+    return getboolean_chk(src, self.BOOLEAN_STATES)
+
+
+proc getboolean*(self: ConfigParser, section, option: string,  # {{{1
+                 fallback: bool, raw = false,
+                 vars: TableRef[string, string] = nil): bool =
     try:
         var src = self.get(section, option, raw, vars)
         return getboolean_chk(src, self.BOOLEAN_STATES)
     except NoOptionError as e:
-        if fallback.en:
-            return fallback.n
-        raise e
+        discard
+    return fallback
 
 
 proc getboolean*(self: SectionTable, option: string): bool =  # {{{1
     var src = self[option]
     return getboolean_chk(src, nil)
+
+
+proc getboolean*(self: SectionTable, option: string, fallback: bool  # {{{1
+                 ): bool =
+    if not self.hasKey(option):
+        return fallback
+    var src = self[option]
+    return getboolean_chk(src, nil)
+
+
+proc get*(self: SectionTable, option: string, fallback: bool): bool =  # {{{1
+    return self.getboolean(option, fallback)
 
 
 proc getlist_parse*(src: string): seq[string] =  # {{{1
@@ -583,7 +642,7 @@ proc getlist*(self: SectionTable, option: string): seq[string] =  # {{{1
     return getlist_parse(src)
 
 
-proc `[]`*(self: var ConfigParser, section: string): SectionTable =  # {{{1
+proc `[]`*(self: ConfigParser, section: string): SectionTable =  # {{{1
     if not self.data.hasKey(section):
         raise newException(NoSectionError, section & " not found")
     return self.data[section]
@@ -788,8 +847,13 @@ proc items*(self: ConfigParser, section: string, raw: bool = false,   # {{{1
 proc items*(self: ConfigParser, raw: bool = false,  # {{{1
             vars: TableRef[string, string] = nil
             ): seq[tuple[section: string, options: SectionTable]] =
-
     for k, v in self.data.pairs():
+        result.add((k, v))
+
+
+proc items*(self: SectionTable, raw: bool = false  # {{{1
+            ): seq[tuple[option, value: string]] =
+    for k, v in self.pairs():
         result.add((k, v))
 
 
