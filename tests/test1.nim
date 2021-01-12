@@ -12,6 +12,7 @@ import tables
 import unittest
 
 import py_configparser
+import py_configparser/common
 
 type
   Config = ref object of RootObj  # {{{1

@@ -91,66 +91,18 @@ import strformat
 import strutils
 import tables
 
+import py_configparser/common
+import py_configparser/private/parse
+
 
 type  # {{{1
-  ParseResult = enum ## enumeration of all events that may occur when parsing
-    opt_and_val,        ## end of file reached
-    opt_and_dup,
-    opt_or_invalid,
-    in_opt,
-    in_empty,
-    in_val,
-    section,            ## a ``[section]`` has been parsed
-    in_error_section,   ## an error occurred during parsing
-
-  Error = object of Exception
-  DuplicateSectionError* = object of Error
-  DuplicateOptionError* = object of Error
-  ParsingError* = object of Error
-  MissingSectionHeaderError* = object of ValueError
-  NoSectionError* = object of Error
-  NoOptionError* = object of Error
-  InterpolationDepthError* = object of Error
-  InterpolationMissingOptionError* = object of Error
-
-  SectionTable* = TableRef[string, string]
-
-  Interpolation* = ref object of RootObj
-    discard
-
   BasicInterpolation* = ref object of Interpolation
     defaults_additional: SectionTable
 
   ExtendedInterpolation* = ref object of Interpolation
     defaults_additional: SectionTable
 
-  ConfigParser* = ref object of RootObj
-    cur_state: ParseResult
-    cur_section: SectionTable
-    cur_section_name: string
-
-    data: TableRef[string, SectionTable]
-    tbl_defaults: SectionTable
-    comment_prefixes: seq[string]
-    inline_comment_prefixes: seq[string]
-    optionxform*: ref proc(src: string): string
-    interpolation: Interpolation
-    BOOLEAN_STATES*: TableRef[string, bool]
-    MAX_INTERPOLATION_DEPTH*: int
-
   SafeConfigParser* = ConfigParser
-
-
-method run(self: Interpolation, cfg: ConfigParser,  # {{{1
-           section, value: string, level: int): string {.base.} =
-    return value
-
-
-proc do_transform(self: ref proc(src: string): string, src: string): string =  # {{{1
-    result = src.toLower()
-    if isNil(self):
-        return result
-    return self[](src)
 
 
 proc initBasicInterpolation*(): BasicInterpolation =  # {{{1
@@ -159,17 +111,6 @@ proc initBasicInterpolation*(): BasicInterpolation =  # {{{1
 
 proc initExtendedInterpolation*(): ExtendedInterpolation =  # {{{1
     result = ExtendedInterpolation()
-
-
-proc initConfigParser*(comment_prefixes = @["#", ";"],  # {{{1
-                       inline_comment_prefixes = @[";"],
-                       interpolation: Interpolation = nil): ConfigParser =
-    return ConfigParser(
-        data: newTable[string, SectionTable](),
-        comment_prefixes: comment_prefixes,
-        inline_comment_prefixes: inline_comment_prefixes,
-        MAX_INTERPOLATION_DEPTH: 10,
-        interpolation: interpolation)
 
 
 proc sections*(self: ConfigParser): seq[string] =  # {{{1
@@ -206,163 +147,8 @@ proc remove_option*(self: var ConfigParser, section, option: string  # {{{1
     return true
 
 
-proc is_match(patterns: seq[string], n: int, line: string, f_space: bool  # {{{1
-              ): bool =
-    if not f_space:
-        return false
-    var blks: seq[string] = @[]
-    var ch_cur = line[n]
-    for ch in patterns:
-        if len(ch) > 1:
-            blks.add(ch)
-            continue
-        if ch[0] == ch_cur:
-            return true
-    if len(blks) < 1:
-        return false
-    for blk in blks:
-        var m = n + len(blk) - 1
-        if m >= len(line):
-            continue
-        var blk_cur = line[n..m]
-        if blk_cur == blk:
-            return true
-    return false
-
-
-proc is_comment(self: ConfigParser, n: int, line: string, f_space: bool  # {{{1
-                ): bool =
-    is_match(self.inline_comment_prefixes, n, line, f_space)
-
-
-proc is_heading_comment(self: ConfigParser, line: string): int =  # {{{1
-    var whitespaces = " \t"
-    for i in 0..len(line) - 1:
-        var ch = line[i]
-        if whitespaces.contains(ch):
-            continue
-        if is_match(self.comment_prefixes, i, line, true):
-            return -2
-        return i
-    return -1
-
-
-proc remove_comment(src: string, space: bool): string =  # {{{1
-    var ret = ""
-    var f_quote = false
-    for i in src:
-        if i == '#':
-            break
-        if f_quote:
-            if i == '"':
-                f_quote = false
-        else:
-            if i == '"':
-                f_quote = true
-        ret &= $i
-    if space:
-        ret = ret.strip()
-    return ret
-
-
-proc parse_finish(c: var ConfigParser, line: string): ParseResult =  # {{{1
-    case c.cur_state:
-    of in_val:
-        return ParseResult.in_val
-    else:
-        discard
-    return ParseResult.in_empty
-
-
-proc parse_section_line(c: var ConfigParser, line: string): ParseResult =  # {{{1
-    var left = line.strip(leading = true)
-    if not left.startsWith("["):
-        return ParseResult.in_empty
-    left = left[1..^1]
-    var right = remove_comment(left, space = true)
-    if not right.endswith("]"):
-        return ParseResult.in_error_section
-    right = right[0..^2]
-
-    var sec = right.strip()
-    c.cur_section_name = sec
-    if sec not_in c.sections():
-        c.cur_section = c.add_section(sec)
-    else:
-        c.cur_section = c.data[sec]
-    return ParseResult.section
-
-
-proc parse_option_value(c: var ConfigParser, line: string  # {{{1
-                        ): tuple[st: ParseResult, opt, val: string] =
-    let splitter_opt_val = "=:"
-    var f_opt = true
-    var f_space = false
-    var opt, val: string
-
-    var n_start = c.is_heading_comment(line)
-    if n_start < 0:
-        return (in_empty, "", "")
-
-    for n in n_start..len(line) - 1:
-        var i = line[n]
-        if f_opt:
-            if c.is_comment(n, line, true):
-                break
-            if splitter_opt_val.contains(i):
-                f_opt = false
-                opt = opt.strip()
-                continue
-            if i == '[':
-                discard c.parse_finish(opt)
-                var ret = c.parse_section_line(line[n..^1])
-                return (ret, "", "")
-            opt &= $i
-        else:
-            var f = f_space
-            f_space = (i == ' ')
-            if c.is_comment(n, line, f):
-                break
-            val &= $i
-    if f_opt:
-        return (opt_or_invalid, "", opt)
-
-    opt = c.optionxform.do_transform(opt)
-    if c.cur_section.hasKey(opt):
-        return (opt_and_dup, opt, val)
-    val = val.strip()
-    return (opt_and_val, opt, val)
-
-
 proc read*(c: var ConfigParser, input: iterator(): string): void =  # {{{1
-    if isNil(c.tbl_defaults):
-        c.tbl_defaults = newTable[string, string]()
-
-    c.data = newTable[string, SectionTable]()
-    c.cur_section = newTable[string, string]()
-    c.cur_section_name = ""
-    c.data.add("", c.cur_section)
-
-    var line, cur_opt, cur_val: string
-    var cur = ParseResult.in_empty
-    for line in input():
-        var (st, opt, val) = c.parse_option_value(line)
-        case st:
-        of opt_and_val:
-            (cur, cur_opt, cur_val) = (ParseResult.in_val, opt, val)
-            c.cur_section.add(opt, val)
-        of opt_and_dup:
-            cur = ParseResult.in_empty
-        of opt_or_invalid:
-            val = val.strip()
-            if cur != ParseResult.in_val:
-                discard
-            elif len(val) > 0 and c.cur_section.hasKey(cur_opt):
-                c.cur_section[cur_opt] &= " " & val
-            else:
-                cur = ParseResult.in_empty
-        else:
-            discard
+    c.parse(input)
 
 
 proc read_file*(c: var ConfigParser, input: Stream, source = ""): void =  # {{{1
@@ -371,7 +157,7 @@ proc read_file*(c: var ConfigParser, input: Stream, source = ""): void =  # {{{1
         while input.readLine(line):
             yield line
 
-    c.read(iter_lines)
+    c.parse(iter_lines)
 
 
 proc read*(c: var ConfigParser, input: string, encoding: string = "") =  # {{{1
