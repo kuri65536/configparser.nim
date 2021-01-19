@@ -30,12 +30,14 @@ type  # {{{1
   ConfigParser* = ref object of RootObj
     data*: TableRef[string, SectionTable]
     tbl_defaults*: SectionTable
+    secname_default*: string
     comment_prefixes*: seq[string]
     inline_comment_prefixes*: seq[string]
     optionxform*: ref proc(src: string): string
     interpolation*: Interpolation
     BOOLEAN_STATES*: TableRef[string, bool]
     MAX_INTERPOLATION_DEPTH*: int
+    f_allow_dups*: bool
 
 
 proc initConfigParser*(comment_prefixes = @["#", ";"],  # {{{1
@@ -45,6 +47,7 @@ proc initConfigParser*(comment_prefixes = @["#", ";"],  # {{{1
         data: newTable[string, SectionTable](),
         comment_prefixes: comment_prefixes,
         inline_comment_prefixes: inline_comment_prefixes,
+        secname_default: "",
         MAX_INTERPOLATION_DEPTH: 10,
         interpolation: interpolation)
 

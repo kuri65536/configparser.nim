@@ -115,11 +115,13 @@ proc initExtendedInterpolation*(): ExtendedInterpolation =  # {{{1
 
 proc sections*(self: ConfigParser): seq[string] =  # {{{1
     for i in self.data.keys():
+        if i == self.secname_default:
+            continue
         result.add(i)
 
 
 proc add_section*(self: var ConfigParser, section: string  # {{{1
-                  ): SectionTable {.discardable.} =  # {{{1
+                  ): SectionTable {.discardable.} =
     if self.data.hasKey(section):
         raise newException(DuplicateSectionError,
                            "section duplicated:" & section)
@@ -133,18 +135,30 @@ proc defaults*(self: ConfigParser): SectionTable =  # {{{1
 
 proc remove_section*(self: var ConfigParser, section: string): void =  # {{{1
     if not self.data.hasKey(section):
-        raise newException(NoSectionError, "section not found:" & section)
+        raise newException(NoSectionError, fmt"section '{section}' not found.")
+    if section == self.secname_default:
+        raise newException(NoSectionError, fmt"section '{section}' not found.")
     self.data.del(section)
 
 
 proc remove_option*(self: var ConfigParser, section, option: string  # {{{1
-                    ): bool {.discardable.} =  # {{{1
+                    ): bool {.discardable.} =
     if not self.data.hasKey(section):
-        raise newException(NoSectionError, "section not found:" & section)
-    if not self.data.hasKey(section):
-        return false
-    self.data[section].del(option)
+        raise newException(NoSectionError, fmt"section '{section}' not found.")
+    var sec = self.data[section]
+    if not sec.hasKey(option):
+        raise newException(NoOptionError,
+                           fmt"option '{section}-{option}' not found.")
+    sec.del(option)
     return true
+
+
+proc del*(self: var SectionTable, option: string): bool =  # {{{1
+    if not self.hasKey(option):
+        # TODO(shimoda): report name
+        raise newException(NoOptionError,
+                           fmt"option '{option}' not found.")
+    self.del(option)
 
 
 proc read*(c: var ConfigParser, input: iterator(): string): void =  # {{{1
@@ -227,24 +241,28 @@ proc do_interpolation(self: ConfigParser, section, value: string,  # {{{1
 
 
 proc get_with_level*(self: ConfigParser, section, option: string,  # {{{1
-                     level: int): tuple[s: string, f: bool] =
+                     level: int): tuple[s: string, err: int] =
     var ret = ""
     var opt = self.optionxform.do_transform(option)
 
     # 2nd search in section.
+    var err = 0
     if self.data.hasKey(section):
         var tbl = self.data[section]
         if tbl.hasKey(opt):
             ret = tbl[opt]
-            return (do_interpolation(self, section, ret, level), true)
+            return (do_interpolation(self, section, ret, level), 0)
+        err = err + 1
+    else:
+        err = err + 4
 
     # 3rd search in default section.
     var tbl = self.data[""]
     if tbl.hasKey(opt):
         ret = tbl[opt]
-        return (do_interpolation(self, section, ret, level), true)
-
-    return ("", false)
+        return (do_interpolation(self, section, ret, level), 0)
+    err = err + 2
+    return ("", err)
 
 
 proc get*(self: ConfigParser, section, option: string, raw = false,  # {{{1
@@ -255,17 +273,20 @@ proc get*(self: ConfigParser, section, option: string, raw = false,  # {{{1
             var ret = vars[opt]
             return do_interpolation(self, section, ret, 1)
 
-    var (ret, found) = self.get_with_level(section, option, 1)
-    if found:
+    var (ret, err) = self.get_with_level(section, option, 1)
+    if err == 0:
         return ret
 
     if len(fallback) < 1:  # finally go into fallback.
+        if (err and 4) != 0:
+            raise newException(NoSectionError,
+                               fmt"does not have section: '{section}'")
         raise newException(NoOptionError, "does not have option: " & opt)
     return do_interpolation(self, section, fallback, 1)
 
 
 proc get*(self: SectionTable, option: string,  # {{{1
-          vars: TableRef[string, string] = nil): string =  # {{{1
+          vars: TableRef[string, string] = nil): string =
     var ret = ""
     var opt = do_transform(nil, option)
     if not self.hasKey(opt):
@@ -306,7 +327,7 @@ proc getint*(self: SectionTable, option: string): int =  # {{{1
 
 
 proc getint*(self: SectionTable, option: string,  # {{{1
-             fallback: int): int =  # {{{1
+             fallback: int): int =
     if not self.hasKey(option):
         return fallback
     var ret = parseInt(self[option])
@@ -411,16 +432,20 @@ proc getlist_parse*(src: string): seq[string] =  # {{{1
 
 
 proc getlist*(self: ConfigParser, section, option: string, raw = false,  # {{{1
-              vars: TableRef[string, string] = nil,
-              fallback: tuple[en: bool, val: seq[string]] = (false, @[])
-              ): seq[string] =
+              vars: TableRef[string, string] = nil): seq[string] =
+    var src = self.get(section, option, raw, vars)
+    return getlist_parse(src)
+
+
+proc getlist*(self: ConfigParser, section, option: string, raw = false,  # {{{1
+              fallback: seq[string],
+              vars: TableRef[string, string] = nil): seq[string] =
     try:
         var src = self.get(section, option, raw, vars)
         return getlist_parse(src)
     except NoOptionError as e:
-        if fallback.en:
-            return fallback.val
-        raise e
+        discard
+    return fallback
 
 
 proc getlist*(self: SectionTable, option: string): seq[string] =  # {{{1
@@ -490,8 +515,8 @@ proc resolve_interpolation(self: BasicInterpolation, cfg: ConfigParser,  # {{{1
     # search value from section, defaults, interpolate's defaults
     var ret = value
     if cfg.has_option(section, ret):
-        var f_dmy: bool
-        (ret, f_dmy) = cfg.get_with_level(section, ret, level + 1)
+        var err: int
+        (ret, err) = cfg.get_with_level(section, ret, level + 1)
     elif not isNil(self.defaults_additional) and
              self.defaults_additional.hasKey(ret):
         ret = self.defaults_additional[ret]
@@ -562,8 +587,8 @@ proc resolve_interpolation(self: ExtendedInterpolation, cfg: ConfigParser,  # {{
         ret = join(seq[1..^1], ":")
 
     if cfg.has_option(section_name, ret):
-        var f_dmy: bool
-        (ret, f_dmy) = cfg.get_with_level(section_name, ret, level + 1)
+        var err: int
+        (ret, err) = cfg.get_with_level(section_name, ret, level + 1)
     elif not isNil(self.defaults_additional) and
              self.defaults_additional.hasKey(ret):
         ret = self.defaults_additional[ret]
@@ -633,7 +658,8 @@ proc items*(self: ConfigParser, section: string, raw: bool = false,   # {{{1
 proc items*(self: ConfigParser, raw: bool = false,  # {{{1
             vars: TableRef[string, string] = nil
             ): seq[tuple[section: string, options: SectionTable]] =
-    for k, v in self.data.pairs():
+    for k in self.sections():
+        var v = self[k]
         result.add((k, v))
 
 

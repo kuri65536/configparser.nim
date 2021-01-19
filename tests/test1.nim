@@ -25,19 +25,19 @@ type
 let cfg = Config(allow_no_value: false,
                  comment_prefixes: @["#", ";"],
                  default_section: "",
-                 delimiters: @["=", ";"],
+                 delimiters: @["=", "="],
+                 # delimiters: @["=", ";"],
                  strict: true)
 
-let basic_test_sections = @["include comments",
-                            "Simple Test",
-                            "sample for i18n",
-                            "LONGLINE",
+let basic_test_sections = @["LONGLINE",
                             "Section\\with$weird%characters[\t",
-                            "include spaces",
-                            "include spaces",
+                            "Simple Test",
+                            "include comments",
                             "include prefix spaces",
-                            "Types"]
-let basic_test_pairs = @[("ghi", "JKL"), ("simplekey", "value")]
+                            "include spaces",
+                            "sample for i18n",
+                            "values for various types"]
+let basic_test_pairs = @[("abc", "def"), ("simplekey", "value")]
 
 
 proc almostEqual(f1, f2: float): bool =  # {{{1
@@ -91,6 +91,8 @@ proc basic_test(): ConfigParser =  # {{{1
         "[include spaces]",
         "simplekey {d0} simple_value",
         "123 {d1} keys can be numbers",
+        "key include spaces {d0} value",
+        "kye2 include spaces {d1} value with spaces",
         "[include prefix spaces]",
         "   simplekey {d0} value",
         "\tabc {d0} def",
@@ -106,18 +108,15 @@ proc basic_test(): ConfigParser =  # {{{1
         "simplekey[en]{d0}English",
         "simplekey[ja]{d0}Japanese",
         "simplekey[th]{d1} Thai",
-        "[include spaces]",
-        "key include spaces {d0} value",
-        "kye2 include spaces {d1} value with spaces",
-        "[value for various types]",
+        "[values for various types]",
         "int {d1} 123",
-        "bool {d0} NO",
+        "bool {d0} no",
         "float {d0} 1.234",
         ])
 
     if cfg.allow_no_value:
         src &= "\n\n[NoValue]\noption-without-value\n"
-    var ret = ConfigParser()
+    var ret = initConfigParser()
     ret.read_string(src)
     return ret
 
@@ -136,18 +135,6 @@ test "api: parser.1tems()":  # {{{1
     check L == basic_test_pairs
 
 
-test "api: parser.sections() mapping access":  # {{{1
-    var cf = basic_test()
-    var L: seq[string] = @[]
-    for section in cf.sections():
-        L.add(section)
-    L.sort(system.cmp)
-    var E = basic_test_sections
-    E.add(cfg.default_section)
-    E.sort(system.cmp)
-    check L == E
-
-
 test "api: parser and section mapping access":  # {{{1
     var cf = basic_test()
     var L = cf["include prefix spaces"].items()
@@ -157,17 +144,17 @@ test "api: parser and section mapping access":  # {{{1
 
     var section = cf["include prefix spaces"]
     check section["simplekey"] == "value"
-    check section["ghi"] == "JKL"
+    check section["abc"] == "def"
 
     check cf["Simple Test"]["simplekey"] == "simplevalue"
     check cf["include spaces"]["simplekey"] == "simple_value"
     check cf["include comments"]["simplekey"] == "bar4"
-    check cf["include comments"]["ghi"] == "JKL"
+    check cf["include comments"]["ghi"] == "JKL #no spaces"
 
-    check cf["include spaces"]["key with spaces"] == "value"
-    check cf["include spaces"]["another with spaces"] == "splat!"
+    check cf["include spaces"]["key include spaces"] == "value"
+    check cf["include spaces"]["kye2 include spaces"] == "value with spaces"
     check cf["LONGLINE"]["simplekey"] ==
-            "long line sample, this is a simple long line value for parser\nlikes it."
+            "long line sample, this is a simple long line value for parser."
     if cfg.allow_no_value:
         check cf["NoValue"]["option-without-value"] == ""
 
@@ -189,16 +176,17 @@ test "api: parser.get*()":  # {{{1
     check cf.get("Simple Test", "simplekey") == "simplevalue"
     check cf.get("include spaces", "simplekey") == "simple_value"
     check cf.get("include prefix spaces", "simplekey") == "value"
-    check cf.get("include prefix spaces", "ghi") == "JKL"
+    check cf.get("include prefix spaces", "abc") == "def"
     check cf.get("include comments", "simplekey") == "bar4"
-    check cf.get("include comments", "ghi") == "JKL"
-    check cf.get("include spaces", "key with spaces") == "value"
-    check cf.get("include spaces", "another with spaces") == "splat!"
-    check cf.getint("Types", "int") == 123
-    check cf.get("Types", "int") == "123"
-    check cf.getfloat("Types", "float") == 1.234
-    check cf.get("Types", "float") == "1.234"
-    check cf.getboolean("Types", "boolean") == false
+    check cf.get("include comments", "ghi") == "JKL #no spaces"
+    check cf.get("include spaces", "key include spaces") == "value"
+    check cf.get("include spaces", "kye2 include spaces") ==
+                "value with spaces"
+    check cf.getint("values for various types", "int") == 123
+    check cf.get("values for various types", "int") == "123"
+    check cf.getfloat("values for various types", "float") == 1.234
+    check cf.get("values for various types", "float") == "1.234"
+    check cf.getboolean("values for various types", "bool") == false
     check cf.get("include spaces", "123") == "keys can be numbers"
     if cfg.allow_no_value:
         check cf.get("NoValue", "option-without-value") == ""
@@ -212,15 +200,15 @@ test "api: parser.get*() w/fallback":  # {{{1
     check cf.get("include spaces", "simplekey", fallback="") == "simple_value"
     check cf.get("No Such include spaces", "simplekey", fallback="") == ""
 
-    check cf.getint("Types", "int", fallback=18) == 42
-    check cf.getint("Types", "no-such-int", fallback=18) == 18
+    check cf.getint("values for various types", "int", fallback=18) == 42
+    check cf.getint("values for various types", "no-such-int", fallback=18) == 18
 
-    check cf.getfloat("Types", "float", fallback=0.0) == 0.44
-    check cf.getfloat("Types", "no-such-float", fallback=0.0) == 0.0
+    check cf.getfloat("values for various types", "float", fallback=0.0) == 0.44
+    check cf.getfloat("values for various types", "no-such-float", fallback=0.0) == 0.0
 
-    check cf.getboolean("Types", "boolean", fallback=true) == false
-    check cf.getboolean("Types", "no-such-boolean", fallback=true) == true
-    check cf.getboolean("No Such Types", "boolean", fallback=true) == true
+    check cf.getboolean("values for various types", "boolean", fallback=true) == false
+    check cf.getboolean("values for various types", "no-such-boolean", fallback=true) == true
+    check cf.getboolean("No Such values for various types", "boolean", fallback=true) == true
     if cfg.allow_no_value:
         check cf.getboolean("NoValue", "option-without-value",
                             fallback=false) == false
@@ -230,6 +218,8 @@ test "api: parser.get*() w/fallback":  # {{{1
 
 test "api: parser.get*() w/vars":  # {{{1
     var cf = basic_test()
+
+    # override by vars.
     var vars = newTable[string, string]()
     vars.add("simplekey", "ghi")
     check cf.get("Simple Test", "simplekey", vars=vars) == "ghi"
@@ -241,28 +231,28 @@ test "api: parser.get*() w/vars":  # {{{1
         discard cf.get("Simple Test", "no-such-foo")
 
     expect NoOptionError:
-        discard cf.getint("Types", "no-such-int")
+        discard cf.getint("values for various types", "no-such-int")
 
     expect NoOptionError:
-        discard cf.getfloat("Types", "no-such-float")
+        discard cf.getfloat("values for various types", "no-such-float")
 
     expect NoOptionError:
-        discard cf.getboolean("Types", "no-such-boolean")
+        discard cf.getboolean("values for various types", "no-such-boolean")
 
-    expect KeyError:  # {{{1
+    expect KeyError:
         discard cf["No Such Simple Test"]["simplekey"]
 
-    expect KeyError:  # {{{1
+    expect KeyError:
         discard cf["Simple Test"]["no-such-foo"]
 
-    expect KeyError:  # {{{1
+    expect KeyError:
         discard cf["No Such Simple Test"].get("simplekey", fallback="ghi")
 
-    expect KeyError:  # {{{1
+    expect KeyError:
         discard cf["No Such include spaces"].get("simplekey", fallback="1")
 
 
-test "API in sections":  # {{{1
+test "api w/sections - get, vars and fallback":  # {{{1
     var cf = basic_test()
     var section = cf["include prefix spaces"]
     #[ TODO(shimoda): impl.
@@ -270,32 +260,51 @@ test "API in sections":  # {{{1
     check section.parser == cf
     ]#
 
-    # test vars= and fallback=
     var vars = newTable({"test": "vars"})
-    check cf["Simple Test"].get("simplekey", "ghi") == "simplevalue"
-    check cf["Simple Test"].get("simplekey", fallback="ghi") == "simplevalue"
-    check cf["Simple Test"].get("simplekey", vars=vars) == "ghi"
+    var sec = cf["Simple Test"]
+    check sec.get("simplekey", "ghi") == "simplevalue"
+    check sec.get("simplekey", fallback="ghi") == "simplevalue"
+    check sec.get("simplekey", vars=vars) == "ghi"
 
-    check cf["Simple Test"].get("no-such-foo", "ghi") == "ghi"
-    check cf["Simple Test"].get("no-such-foo", fallback="ghi") == "ghi"
-    check cf["Simple Test"].get("no-such-foo") == ""
-    check cf["include spaces"].get("simplekey", "") == "simple_value"
-    check cf["include spaces"].get("simplekey", fallback="") == "simple_value"
 
-    check cf["Types"].getint("int", 18) == 42
-    check cf["Types"].getint("int", fallback=18) == 42
-    check cf["Types"].getint("no-such-int", 18) == 18
-    check cf["Types"].getint("no-such-int", fallback=18) == 18
+test "api w/sections - get and fallback":  # {{{1
+    var cf = basic_test()
+    var sec = cf["Simple Test"]
+    check sec.get("no-such-foo", "ghi") == "ghi"
+    check sec.get("no-such-foo", fallback="ghi") == "ghi"
+    if not cfg.strict:
+        check cf["Simple Test"].get("no-such-foo") == ""
 
-    check almostEqual(cf["Types"].getfloat("float", 0.0), 0.44)
-    check almostEqual(cf["Types"].getfloat("float", fallback=0.0), 0.44)
-    check almostEqual(cf["Types"].getfloat("no-such-float", 0.0), 0.0)
-    check almostEqual(cf["Types"].getfloat("no-such-float", fallback=0.0), 0.0)
+    sec = cf["include spaces"]
+    check sec.get("simplekey", "") == "simple_value"
+    check sec.get("simplekey", fallback="") == "simple_value"
 
-    check cf["Types"].getboolean("boolean", true) == false
-    check cf["Types"].getboolean("boolean", fallback=true) == false
-    check cf["Types"].getboolean("no-such-boolean", true) == true
-    check cf["Types"].getboolean("no-such-boolean", fallback=true) == true
+
+test "api w/sections - getint and fallback":  # {{{1
+    var cf = basic_test()
+    var sec = cf["values for various types"]
+    check sec.getint("int", 18) == 123
+    check sec.getint("int", fallback=18) == 123
+    check sec.getint("no-such-int", 18) == 18
+    check sec.getint("no-such-int", fallback=18) == 18
+
+
+test "api w/sections - getfloat and fallback":  # {{{1
+    var cf = basic_test()
+    var sec = cf["values for various types"]
+    check almostEqual(sec.getfloat("float", 0.0), 1.234)
+    check almostEqual(sec.getfloat("float", fallback=0.0), 1.234)
+    check almostEqual(sec.getfloat("no-such-float", 0.0), 0.0)
+    check almostEqual(sec.getfloat("no-such-float", fallback=0.0), 0.0)
+
+
+test "api w/sections - getboolean and fallback":  # {{{1
+    var cf = basic_test()
+    var sec = cf["values for various types"]
+    check sec.getboolean("bool", true) == false
+    check sec.getboolean("bool", fallback=true) == false
+    check sec.getboolean("no-such-boolean", true) == true
+    check sec.getboolean("no-such-boolean", fallback=true) == true
 
     if cfg.allow_no_value:
         check cf["NoValue"].get("option-without-value", false) == false
@@ -303,71 +312,66 @@ test "API in sections":  # {{{1
         check cf["NoValue"].get("no-such-option-without-value", false) == false
         check cf["NoValue"].get("no-such-option-without-value", fallback=false) == false
 
-    # Make sure the right things happen for remove_section() and
-    # remove_option(); added to include check for SourceForge bug #123324.
+
+test "api w/sections - remove_option":  # {{{1
+    var cf = basic_test()
 
     cf[cfg.default_section]["this_value"] = "1"
     cf[cfg.default_section]["that_value"] = "2"
 
     # API access
     check cf.has_option("include spaces", "key with spaces") == false
-    expect NoSectionError:
-        cf.remove_section(cfg.default_section)
-    # remove_option() failed to report existence of option
     expect NoOptionError:
-        cf.remove_option("Simple Test", "simplekey")
-    # remove_option() failed to remove option"
-    check cf.has_option("Simple Test", "simplekey") == false
-    # remove_option() failed to report non-existence of option that was removed
-    expect NoOptionError:
-        cf.remove_option("Simple Test", "simplekey")
+        cf.remove_option("include spaces", "key with spaces")
+
+    cf.remove_option(cfg.default_section, "this_value")
     expect NoOptionError:
         cf.remove_option("Simple Test", "this_value")
-    cf.remove_option(cfg.default_section, "this_value")
+
+
+test "api w/sections - remove_section":  # {{{1
+    var cf = basic_test()
+    expect NoSectionError:
+        cf.remove_section(cfg.default_section)
+        check getCurrentExceptionMsg() == "No Such Section"
     check cf.has_option("Simple Test", "this_value") == false
-    check cf.remove_option(cfg.default_section, "this_value") == false
 
-    #[
-    with self.assertRaises(configparser.NoSectionError) as cm:
+    expect NoSectionError:
         cf.remove_option("No Such Section", "simplekey")
-    ]#
-    expect NoSectionError:
-        check getCurrentExceptionMsg() == "No Such Section"
-    expect NoSectionError:
         check getCurrentExceptionMsg() == "No Such Section"
 
-    check cf.get("LONGLINE", "simplekey") ==
-        "long line sample, this is a simple long line value for parser\nlikes it."
 
+test "api w/sections - remove sections by map":  # {{{1
     #[ table access
-    TODO(shimoda): implement table style: cf.del("Types")
-    TODO(shimoda): implement table style: check ("Types" in cf) == false
+    TODO(shimoda): implement table style: cf.del("values for various types")
+    TODO(shimoda): implement table style: check ("values for various types" in cf) == false
     expect: NoSection:
-        cf.del("Types")
+        cf.del("values for various types")
     expect: ValueError:
         cf.del(self.default_section)
     ]#
-    cf["include spaces"].del("simplekey")
-    check "simplekey" in cf["include spaces"] == false
+    skip()
+
+
+test "api w/sections - remove options by map":  # {{{1
+    var cf = basic_test()
+    cf[cfg.default_section]["that_value"] = "2"
+
+    check "complexkey" in cf["include spaces"] == false
     expect KeyError:
-        cf["include spaces"].del("simplekey")
+        cf["include spaces"].del("complexkey")
+
     check "that_value" in cf["include spaces"] == true
+    cf[cfg.default_section].del("that_value")
     expect KeyError:
         cf["include spaces"].del("that_value")
-    cf[cfg.default_section].del("that_value")
-    check "that_value" in cf["include spaces"] == false
-    expect KeyError:
-        cf[cfg.default_section].del("that_value")
-    expect KeyError:
+
+    expect NoSectionError:
         cf["No Such Section"].del("simplekey")
 
-    # Don't add new asserts below in this method as most of the options
-    # and sections are now removed.
 
-
-test "API, in sections - read dups":  # {{{1
-    var cf = basic_test()
-
+test "API, in sections - read dups opts":  # {{{1
+    var cf = initConfigParser()
     expect DuplicateOptionError:
         if not cfg.strict:
             raise newException(DuplicateOptionError, "skipped")
@@ -375,6 +379,9 @@ test "API, in sections - read dups":  # {{{1
                                    "option {d0} with a value",
                                    "option {d1} with another value"]))
 
+
+test "API, in sections - read dups sections":  # {{{1
+    var cf = initConfigParser()
     expect DuplicateSectionError:
         if not cfg.strict:
             raise newException(DuplicateOptionError, "skipped")
@@ -388,6 +395,7 @@ test "can load duplicated contents":  # {{{1
     if cfg.strict:
         skip()
     var cf = basic_test()
+    cf.f_allow_dups = true
     var (d1, d2) = (cfg.delimiters[0], cfg.delimiters[1])
     cf.read_string(conv_delim([
         "[Duplicate Options Here]",
@@ -407,7 +415,7 @@ test "can omit comment 1":
     check ini.get("", "test") == "test"
 
 test "can omit comment 2 - sections":
-    var ini = ConfigParser()
+    var ini = initConfigParser()
     ini.read_string("[sec1]  # comment\naaa = bbb\n" &
                              "[sec2]# comment\nabc = bcd\n" &
                              "[  sec3  ]   \nhij = lmn")
@@ -438,7 +446,7 @@ test "fallback test 1":
     check ini.get("sec3", "none", fallback = "fb") == "fb"
 
 test "fallback test 2":
-    var ini = ConfigParser()
+    var ini = initConfigParser()
     ini.read_file(newStringStream("[sec1]\na = 1\n" &
                                   "[sec2]\nb = 2.5\n" &
                                   "[sec3]\nc = true\n" &
@@ -451,16 +459,16 @@ test "fallback test 2":
     check ini.getboolean("sec3", "d", fallback=false) == false
     check ini.getboolean("sec3", "d", fallback=true) == true
     check ini.getlist("sec4", "d") == @["1", "2", "3", "4", "5"]
-    check ini.getlist("sec4", "e", fallback=(true, @["10"])) == @["10"]
+    check ini.getlist("sec4", "e", fallback = @["10"]) == @["10"]
 
 
 proc cfg_multiline(): ConfigParser =  # {{{1
     var cfg = initConfigParser()
-    cfg.read_string("""[
+    cfg.read_string("""
         [LONGLINE]
         foo = long line sample, this is a simple long line value for parser
            likes it.
-        []
+        #[]
         bar= another very
          long line
         [LONGLINE - With Comments!]
@@ -474,7 +482,7 @@ proc cfg_multiline(): ConfigParser =  # {{{1
 
 test "multiline - 1":
     var cfg = cfg_multiline()
-    check cfg.get("LONGLINE", "simplekey") ==
+    check cfg.get("LONGLINE", "foo") ==
         "long line sample, this is a simple long line value for parser likes it."
 
 test "multiline - 2":

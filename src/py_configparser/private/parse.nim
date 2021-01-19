@@ -33,38 +33,34 @@ type  # {{{1
     cur_section_name: string
 
 
-proc sections*(self: ConfigParser): seq[string] =  # {{{1
+proc sections_local(self: ConfigParser): seq[string] =  # {{{1
     for i in self.data.keys():
         result.add(i)
 
 
-proc add_section*(self: var ConfigParser, section: string  # {{{1
-                  ): SectionTable {.discardable.} =  # {{{1
-    if self.data.hasKey(section):
+proc add_section(self: var ConfigParser, section: string  # {{{1
+                 ): SectionTable {.discardable.} =
+    if section not_in self.sections_local():
+        result = newTable[string, string]()
+        self.data.add(section, result)
+        return result
+
+    if not self.f_allow_dups:
         raise newException(DuplicateSectionError,
                            "section duplicated:" & section)
-    result = newTable[string, string]()
-    self.data.add(section, result)
+    return self.data[section]
+
+
+proc add_option(self: var SectionTable, opt, val: string  # {{{1
+                ): void =
+    if self.hasKey(opt):
+        raise newException(DuplicateOptionError,
+                           "option duplicated:" & opt)
+    self.add(opt, val)
 
 
 proc defaults*(self: ConfigParser): SectionTable =  # {{{1
     return self.tbl_defaults
-
-
-proc remove_section*(self: var ConfigParser, section: string): void =  # {{{1
-    if not self.data.hasKey(section):
-        raise newException(NoSectionError, "section not found:" & section)
-    self.data.del(section)
-
-
-proc remove_option*(self: var ConfigParser, section, option: string  # {{{1
-                    ): bool {.discardable.} =  # {{{1
-    if not self.data.hasKey(section):
-        raise newException(NoSectionError, "section not found:" & section)
-    if not self.data.hasKey(section):
-        return false
-    self.data[section].del(option)
-    return true
 
 
 proc is_match(patterns: seq[string], n: int, line: string, f_space: bool  # {{{1
@@ -146,19 +142,16 @@ proc parse_section_line(self: ParserStatus, c: var ConfigParser,   # {{{1
         return ParseResult.in_error_section
     right = right[0..^2]
 
-    var sec = right.strip()
+    var sec = right.strip(chars = {' '})
     self.cur_section_name = sec
-    if sec not_in c.sections():
-        self.cur_section = c.add_section(sec)
-    else:
-        self.cur_section = c.data[sec]
+    self.cur_section = c.add_section(sec)
     return ParseResult.section
 
 
 proc parse_option_value(self: ParserStatus,  # {{{1
                         c: var ConfigParser, line: string
                         ): tuple[st: ParseResult, opt, val: string] =
-    let splitter_opt_val = "=:"
+    let splitter_opt_val = {'=', ';'}
     var f_opt = true
     var f_space = false
     var opt, val: string
@@ -192,6 +185,9 @@ proc parse_option_value(self: ParserStatus,  # {{{1
 
     opt = c.optionxform.do_transform(opt)
     if self.cur_section.hasKey(opt):
+        if not c.f_allow_dups:
+            raise newException(DuplicateOptionError,
+                               "duplicated option: " & opt)
         return (opt_and_dup, opt, val)
     val = val.strip()
     return (opt_and_val, opt, val)
@@ -200,12 +196,13 @@ proc parse_option_value(self: ParserStatus,  # {{{1
 proc parse*(c: var ConfigParser, input: iterator(): string): void =  # {{{1
     if isNil(c.tbl_defaults):
         c.tbl_defaults = newTable[string, string]()
+    if isNil(c.data):
+        c.data = newTable[string, SectionTable]()
 
-    c.data = newTable[string, SectionTable]()
     var stat = ParserStatus()
-    stat.cur_section = newTable[string, string]()
-    stat.cur_section_name = ""
-    c.data.add("", stat.cur_section)
+    stat.cur_section = c.tbl_defaults
+    stat.cur_section_name = c.secname_default
+    c.data.add(c.secname_default, stat.cur_section)
 
     var line, cur_opt, cur_val: string
     var cur = ParseResult.in_empty
@@ -214,7 +211,7 @@ proc parse*(c: var ConfigParser, input: iterator(): string): void =  # {{{1
         case st:
         of opt_and_val:
             (cur, cur_opt, cur_val) = (ParseResult.in_val, opt, val)
-            stat.cur_section.add(opt, val)
+            stat.cur_section.add_option(opt, val)
         of opt_and_dup:
             cur = ParseResult.in_empty
         of opt_or_invalid:
@@ -227,24 +224,6 @@ proc parse*(c: var ConfigParser, input: iterator(): string): void =  # {{{1
                 cur = ParseResult.in_empty
         else:
             discard
-
-
-proc options*(self: ConfigParser, section: string): seq[string] =  # {{{1
-    var ret: seq[string] = @[]
-    for i in self.data[section].keys():
-        ret.add(i)
-    return ret
-
-
-proc has_section*(self: ConfigParser, section: string): bool =  # {{{1
-    return self.sections().contains(section)
-
-
-proc has_option*(self: ConfigParser, section, option: string): bool =  # {{{1
-    if not self.data.hasKey(section):
-        return false
-    var opt = self.optionxform.do_transform(option)
-    return self.data[section].hasKey(opt)
 
 
 # end of file {{{1
