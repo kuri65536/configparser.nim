@@ -2,6 +2,7 @@ import streams
 import unittest
 
 import py_configparser
+import py_configparser/common
 
 
 test "converters from python 3.5":

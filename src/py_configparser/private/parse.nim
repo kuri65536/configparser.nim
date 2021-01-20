@@ -41,7 +41,8 @@ proc sections_local(self: ConfigParser): seq[string] =  # {{{1
 proc add_section(self: var ConfigParser, section: string  # {{{1
                  ): SectionTable {.discardable.} =
     if section not_in self.sections_local():
-        result = newTable[string, string]()
+        result = SectionTable(name: section)
+        result.data = newTable[string, string]()
         self.data.add(section, result)
         return result
 
@@ -53,10 +54,10 @@ proc add_section(self: var ConfigParser, section: string  # {{{1
 
 proc add_option(self: var SectionTable, opt, val: string  # {{{1
                 ): void =
-    if self.hasKey(opt):
+    if self.data.hasKey(opt):
         raise newException(DuplicateOptionError,
                            "option duplicated:" & opt)
-    self.add(opt, val)
+    self.data.add(opt, val)
 
 
 proc defaults*(self: ConfigParser): SectionTable =  # {{{1
@@ -151,7 +152,7 @@ proc parse_section_line(self: ParserStatus, c: var ConfigParser,   # {{{1
 proc parse_option_value(self: ParserStatus,  # {{{1
                         c: var ConfigParser, line: string
                         ): tuple[st: ParseResult, opt, val: string] =
-    let splitter_opt_val = {'=', ';'}
+    let splitter_opt_val = {'=', ':'}
     var f_opt = true
     var f_space = false
     var opt, val: string
@@ -184,7 +185,7 @@ proc parse_option_value(self: ParserStatus,  # {{{1
         return (opt_or_invalid, "", opt)
 
     opt = c.optionxform.do_transform(opt)
-    if self.cur_section.hasKey(opt):
+    if self.cur_section.data.hasKey(opt):
         if not c.f_allow_dups:
             raise newException(DuplicateOptionError,
                                "duplicated option: " & opt)
@@ -195,7 +196,9 @@ proc parse_option_value(self: ParserStatus,  # {{{1
 
 proc parse*(c: var ConfigParser, input: iterator(): string): void =  # {{{1
     if isNil(c.tbl_defaults):
-        c.tbl_defaults = newTable[string, string]()
+        var sec = SectionTable(name: c.secname_default)
+        sec.data = newTable[string, string]()
+        c.tbl_defaults = sec
     if isNil(c.data):
         c.data = newTable[string, SectionTable]()
 
@@ -218,8 +221,8 @@ proc parse*(c: var ConfigParser, input: iterator(): string): void =  # {{{1
             val = val.strip()
             if cur != ParseResult.in_val:
                 discard
-            elif len(val) > 0 and stat.cur_section.hasKey(cur_opt):
-                stat.cur_section[cur_opt] &= " " & val
+            elif len(val) > 0 and stat.cur_section.data.hasKey(cur_opt):
+                stat.cur_section.data[cur_opt] &= " " & val
             else:
                 cur = ParseResult.in_empty
         else:

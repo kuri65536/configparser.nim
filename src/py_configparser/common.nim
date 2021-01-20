@@ -22,7 +22,10 @@ type  # {{{1
   InterpolationDepthError* = object of Error
   InterpolationMissingOptionError* = object of Error
 
-  SectionTable* = TableRef[string, string]
+  SectionTable* = ref object of RootObj
+    name*: string
+    parser*: ConfigParser
+    data*: TableRef[string, string]
 
   Interpolation* = ref object of RootObj
     discard
@@ -40,16 +43,26 @@ type  # {{{1
     f_allow_dups*: bool
 
 
+proc clear*(cf: var ConfigParser,  # {{{1
+            comment_prefixes: seq[string] = @["#", ";"],
+            inline_comment_prefixes: seq[string] = @[";"],
+            interpolation: Interpolation = nil
+            ): ConfigParser {.discardable.} =
+    cf.data = newTable[string, SectionTable]()
+    cf.secname_default = ""
+    cf.MAX_INTERPOLATION_DEPTH = 10
+
+    cf.comment_prefixes = comment_prefixes
+    cf.inline_comment_prefixes = inline_comment_prefixes
+    cf.interpolation = interpolation
+    return cf
+
+
 proc initConfigParser*(comment_prefixes = @["#", ";"],  # {{{1
                        inline_comment_prefixes = @[";"],
                        interpolation: Interpolation = nil): ConfigParser =
-    return ConfigParser(
-        data: newTable[string, SectionTable](),
-        comment_prefixes: comment_prefixes,
-        inline_comment_prefixes: inline_comment_prefixes,
-        secname_default: "",
-        MAX_INTERPOLATION_DEPTH: 10,
-        interpolation: interpolation)
+    var ret = ConfigParser()
+    return ret.clear(comment_prefixes, inline_comment_prefixes, interpolation)
 
 
 proc do_transform*(self: ref proc(src: string): string, src: string): string =  # {{{1

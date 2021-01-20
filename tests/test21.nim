@@ -2,6 +2,7 @@ import streams
 import unittest
 
 import py_configparser
+import py_configparser/common
 
 
 test "comment handlings":  # {{{1
@@ -17,6 +18,8 @@ test "comment handlings":  # {{{1
         quirk: this;is not a comment
         ; a space must precede an inline comment
         """)
+    check cf.has_section("Commented Bar") == true
+    echo cf.options("Commented Bar")
     check cf.get("Commented Bar", "foo") == "bar # not a comment!"
     check cf.get("Commented Bar", "baz") == "qwe"
     check cf.get("Commented Bar", "quirk") == "this;is not a comment"

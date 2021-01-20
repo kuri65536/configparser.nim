@@ -4,6 +4,7 @@ import system
 import unittest
 
 import py_configparser
+import py_configparser/common
 
 
 test "can remove section":

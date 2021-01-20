@@ -200,20 +200,26 @@ test "api: parser.get*() w/fallback":  # {{{1
     check cf.get("include spaces", "simplekey", fallback="") == "simple_value"
     check cf.get("No Such include spaces", "simplekey", fallback="") == ""
 
-    check cf.getint("values for various types", "int", fallback=18) == 42
-    check cf.getint("values for various types", "no-such-int", fallback=18) == 18
+    var sec1 = "values for various types"
+    check cf.getint(sec1, "int", fallback=18) == 123
+    check cf.getint(sec1, "no-such-int", fallback=18) == 18
 
-    check cf.getfloat("values for various types", "float", fallback=0.0) == 0.44
-    check cf.getfloat("values for various types", "no-such-float", fallback=0.0) == 0.0
+    check cf.getfloat(sec1, "float", fallback=0.0) == 1.234
+    check cf.getfloat(sec1, "no-such-float", fallback=0.0) == 0.0
 
-    check cf.getboolean("values for various types", "boolean", fallback=true) == false
-    check cf.getboolean("values for various types", "no-such-boolean", fallback=true) == true
-    check cf.getboolean("No Such values for various types", "boolean", fallback=true) == true
+    check cf.getboolean(sec1, "bool", fallback=true) == false
+    check cf.getboolean(sec1, "no-such-boolean", fallback=true) == true
+
+    check cf.getboolean("No Such values for various types",
+                        "boolean", fallback=true) == true
     if cfg.allow_no_value:
         check cf.getboolean("NoValue", "option-without-value",
                             fallback=false) == false
         check cf.getboolean("NoValue", "no-such-option-without-value",
                             fallback=false) == false
+
+    expect NoSectionError:
+        discard cf["No Such include spaces"].get("simplekey", fallback="1")
 
 
 test "api: parser.get*() w/vars":  # {{{1
@@ -239,17 +245,14 @@ test "api: parser.get*() w/vars":  # {{{1
     expect NoOptionError:
         discard cf.getboolean("values for various types", "no-such-boolean")
 
-    expect KeyError:
+    expect NoSectionError:
         discard cf["No Such Simple Test"]["simplekey"]
 
-    expect KeyError:
-        discard cf["Simple Test"]["no-such-foo"]
-
-    expect KeyError:
+    expect NoSectionError:
         discard cf["No Such Simple Test"].get("simplekey", fallback="ghi")
 
-    expect KeyError:
-        discard cf["No Such include spaces"].get("simplekey", fallback="1")
+    expect NoOptionError:
+        discard cf["Simple Test"]["no-such-foo"]
 
 
 test "api w/sections - get, vars and fallback":  # {{{1
@@ -260,11 +263,14 @@ test "api w/sections - get, vars and fallback":  # {{{1
     check section.parser == cf
     ]#
 
-    var vars = newTable({"test": "vars"})
+    var vars = newTable({"complexkey": "jkl"})
     var sec = cf["Simple Test"]
     check sec.get("simplekey", "ghi") == "simplevalue"
     check sec.get("simplekey", fallback="ghi") == "simplevalue"
-    check sec.get("simplekey", vars=vars) == "ghi"
+    check sec.get("simplekey", vars=vars) == "simplevalue"
+
+    check sec.get("complexkey", fallback="ghi") == "ghi"
+    check sec.get("complexkey", vars=vars) == "jkl"
 
 
 test "api w/sections - get and fallback":  # {{{1
@@ -358,12 +364,12 @@ test "api w/sections - remove options by map":  # {{{1
     cf[cfg.default_section]["that_value"] = "2"
 
     check "complexkey" in cf["include spaces"] == false
-    expect KeyError:
+    expect NoOptionError:
         cf["include spaces"].del("complexkey")
 
-    check "that_value" in cf["include spaces"] == true
+    check "that_value" in cf[cfg.default_section] == true
     cf[cfg.default_section].del("that_value")
-    expect KeyError:
+    expect NoOptionError:
         cf["include spaces"].del("that_value")
 
     expect NoSectionError:
