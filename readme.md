@@ -1,13 +1,70 @@
 `configparser`
 ===============================================================================
-yet another configuration file parser like python behaviors.
+yet another configuration file parser to able python behaviors.
+
+- can parse multiline values. (thats I need it.)
+- can use interpolation.
+<!-- - can change delimiters. -->
+
+but this module not use regex for parsing,
+compared from original python implementation.
+
+This repository goal is to make up my project compatiblity in python and nim,
+not enable to implement the all features.
 
 
-## install
+
+How to use
+-----------------------------------------
+use from your nim project, install from nimble and import this.
+
+use from nimble::
+
+```shell
+$ nimble install https://github.com/kuri65536/configparser.nim
+```
+
+from git::
+
+```shell
+$ git clone install https://github.com/kuri65536/configparser.nim configparser
+$ cat > test.nim <<EOF
+import configparser/src/configparser
+var cf = initConfigParser()
+cf.read_string("[test]\na = b")
+echo cf.get("test", "b")
+EOF
+$ nim c -r test.nim
+```
+
+
+### Requirements
+- nim (>= 0.19.4)
+
+
+### In Debian buster
+```shell
+$ sudo apt intall nim
+```
 
 
 
-## implement status
+TODO
+-----------------------------------------
+- `write` function.
+- complete `default section`
+- the delimiter option
+- the strict option
+- ??? complex expressions in interpolations.
+
+### no plan to implement
+- T.B.D...
+- the option: `allow_no_value`
+
+
+
+Implement status
+-----------------------------------------
 
 ### class
 
@@ -67,3 +124,52 @@ MissingSectionHeaderError       |   | ...
 ParsingError                    | o | ...
 
 
+
+Development Environment
+-----------------------------------------
+
+| term | description   |
+|:----:|:--------------|
+| OS   | Debian on Android 10 |
+| lang | nim |
+
+
+
+Reference
+-----------------------------------------
+- https://docs.python.org/ja/3/library/configparser.html
+
+
+
+License
+-----------------------------------------
+see the top of source code, it is MPL2.0.
+
+
+
+Samples
+-----------------------------------------
+see tests folder.
+
+
+
+Release
+-----------------------------------------
+| version | description |
+|:-------:|:---|
+| 0.2.0   | rename to configparser, remove heading `py_` |
+| 0.1.0   | 1st version |
+
+
+
+Donations
+---------------------
+If you are feel to nice for this software, please donation to my
+
+- Bitcoin **| 1FTBAUaVdeGG9EPsGMD5j2SW8QHNc5HzjT |**
+- Ether **| 0xd7Dc5cd13BD7636664D6bf0Ee8424CFaF6b2FA8f |**
+- or librapay, I'm glad from smaller (about $1) and welcome more :D
+
+<!--
+vi: ft=markdown:et:fdm=marker
+-->
