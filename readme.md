@@ -1,4 +1,4 @@
-`py_configparser`
+`configparser`
 ===============================================================================
 yet another configuration file parser like python behaviors.
 

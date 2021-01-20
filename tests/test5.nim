@@ -1,7 +1,6 @@
 import unittest
 
-import py_configparser
-import py_configparser/common
+import configparser
 
 
 test "doesn't strip inline comment":

@@ -11,8 +11,7 @@ import strutils
 import tables
 import unittest
 
-import py_configparser
-import py_configparser/common
+import configparser
 
 type
   Config = ref object of RootObj  # {{{1

@@ -91,8 +91,17 @@ import strformat
 import strutils
 import tables
 
-import py_configparser/common
-import py_configparser/private/parse
+import configparser/common
+import configparser/private/parse
+
+export common.ConfigParser
+export common.initConfigParser
+export common.NoOptionError
+export common.NoSectionError
+export common.DuplicateOptionError
+export common.DuplicateSectionError
+export common.InterpolationDepthError
+export common.InterpolationMissingOptionError
 
 
 type  # {{{1
@@ -194,6 +203,8 @@ proc read_file*(c: var ConfigParser, input: Stream, source = ""): void =  # {{{1
 
 proc read*(c: var ConfigParser, input: string, encoding: string = "") =  # {{{1
     var fp = newFileStream(input, fmRead)
+    if isNil(fp):
+        raise newException(IOError, "can't open file: " & input)
     defer: fp.close
     c.read_file(fp, input)
 

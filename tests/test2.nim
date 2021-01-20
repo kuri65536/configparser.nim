@@ -3,8 +3,7 @@ import streams
 import system
 import unittest
 
-import py_configparser
-import py_configparser/common
+import configparser
 
 
 test "can remove section":
