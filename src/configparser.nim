@@ -1,8 +1,7 @@
 #[
-yet another python config parser for Nim
+`configparser`
 ===============================================================================
-- do not use regex.
-
+yet another configuration file parser to able python behaviors.
 
 ## license <!-- {{{1 -->
 Copyright (c) 2020, shimoda as kuri65536 _dot_ hot mail _dot_ com
@@ -12,76 +11,22 @@ This Source Code Form is subject to the terms of the Mozilla Public License,
 v.2.0. If a copy of the MPL was not distributed with this file,
 You can obtain one at https://mozilla.org/MPL/2.0/.
 
-## Example <!-- {{{1 -->
+## Example
 
 ```nim
-import py_configparser
+import configparser
 
 var cfg = initConfigParser()
-cfg.read_file(paramStr(1))
+cfg.read_string("""
+    [Package]
+    name = "hello"
+    --threads:on
+    [Author]
+    name = "lihf8515"
+    qq = "10214028"
+    email = "lihaifeng@wxm.com"
+    """)
 echo cfg.get("some", "option")
-```
-
-
-### Examples
-
-```ini
-charset = "utf-8"
-[Package]
-name = "hello"
---threads:on
-[Author]
-name = "lihf8515"
-qq = "10214028"
-email = "lihaifeng@wxm.com"
-```
-
-### (under development) Creating a configuration file.
-
-```nim
-import py_configparser
-
-var cfg = initConfigParser()
-cfg.set("","charset","utf-8")
-cfg.set("Package","name","hello")
-cfg.set("Package","--threads","on")
-cfg.set("Author","name","lihf8515")
-cfg.set("Author","qq","10214028")
-cfg.set("Author","email","lihaifeng@wxm.com")
-cfg.writeConfig("config.ini")
-```
-
-### Reading a configuration file.
-
-```nim
-import parsecfg
-var dict = loadConfig("config.ini")
-var charset = dict.getSectionValue("","charset")
-var threads = dict.getSectionValue("Package","--threads")
-var pname = dict.getSectionValue("Package","name")
-var name = dict.getSectionValue("Author","name")
-var qq = dict.getSectionValue("Author","qq")
-var email = dict.getSectionValue("Author","email")
-echo pname & "\n" & name & "\n" & qq & "\n" & email
-```
-
-### Modifying a configuration file.
-
-```nim
-import parsecfg
-var dict = loadConfig("config.ini")
-dict.setSectionKey("Author","name","lhf")
-dict.writeConfig("config.ini")
-```
-
-
-### Deleting a section key in a configuration file.
-
-```nim
-import parsecfg
-var dict = loadConfig("config.ini")
-dict.delSectionKey("Author","email")
-dict.writeConfig("config.ini")
 ```
 
 ]#  # import {{{1
@@ -94,6 +39,9 @@ import tables
 import configparser/common
 import configparser/private/parse
 
+
+# exports {{{1
+# import `configparser/common` to use all symbols
 export common.ConfigParser
 export common.initConfigParser
 export common.NoOptionError
