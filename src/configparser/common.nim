@@ -49,7 +49,7 @@ proc clear*(cf: var ConfigParser,  # {{{1
             interpolation: Interpolation = nil
             ): ConfigParser {.discardable.} =
     cf.data = newTable[string, SectionTable]()
-    cf.secname_default = ""
+    cf.secname_default = "DEFAULT"
     cf.MAX_INTERPOLATION_DEPTH = 10
 
     cf.comment_prefixes = comment_prefixes

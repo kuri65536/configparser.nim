@@ -12,21 +12,7 @@ import tables
 import unittest
 
 import configparser
-
-type
-  Config = ref object of RootObj  # {{{1
-    allow_no_value: bool
-    comment_prefixes: seq[string]
-    default_section: string
-    delimiters: seq[string]
-    strict: bool
-
-let cfg = Config(allow_no_value: false,
-                 comment_prefixes: @["#", ";"],
-                 default_section: "",
-                 delimiters: @["=", "="],
-                 # delimiters: @["=", ";"],
-                 strict: true)
+import ./utils
 
 let basic_test_sections = @["LONGLINE",
                             "Section\\with$weird%characters[\t",
@@ -41,15 +27,6 @@ let basic_test_pairs = @[("abc", "def"), ("simplekey", "value")]
 
 proc almostEqual(f1, f2: float): bool =  # {{{1
     return abs(f1 - f2) < 1e-12
-
-
-proc conv_delim(src: openArray[string]): string =  # {{{1
-    var ret = join(src, "\n")
-    ret = ret.replace("{d0}", cfg.delimiters[0])
-    ret = ret.replace("{d1}", cfg.delimiters[1])
-    ret = ret.replace("{c0}", cfg.comment_prefixes[0])
-    ret = ret.replace("{c1}", cfg.comment_prefixes[1])
-    return ret
 
 
 test "can basic parse":
@@ -488,7 +465,8 @@ proc cfg_multiline(): ConfigParser =  # {{{1
 test "multiline - 1":
     var cfg = cfg_multiline()
     check cfg.get("LONGLINE", "foo") ==
-        "long line sample, this is a simple long line value for parser likes it."
+            "long line sample, this is a simple long line value for parser " &
+            "likes it."
 
 test "multiline - 2":
     var cfg = cfg_multiline()

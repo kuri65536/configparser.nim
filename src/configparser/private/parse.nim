@@ -46,6 +46,9 @@ proc add_section(self: var ConfigParser, section: string  # {{{1
         self.data.add(section, result)
         return result
 
+    if section == self.secname_default:
+        return self.data[section]
+
     if not self.f_allow_dups:
         raise newException(DuplicateSectionError,
                            "section duplicated:" & section)
@@ -222,7 +225,7 @@ proc parse*(c: var ConfigParser, input: iterator(): string): void =  # {{{1
             if cur != ParseResult.in_val:
                 discard
             elif len(val) > 0 and stat.cur_section.data.hasKey(cur_opt):
-                stat.cur_section.data[cur_opt] &= " " & val
+                stat.cur_section.data[cur_opt] &= "\n\t" & val
             else:
                 cur = ParseResult.in_empty
         else:

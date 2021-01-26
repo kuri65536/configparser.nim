@@ -38,6 +38,7 @@ import tables
 
 import configparser/common
 import configparser/private/parse
+import configparser/private/dump
 
 
 # exports {{{1
@@ -50,6 +51,8 @@ export common.DuplicateOptionError
 export common.DuplicateSectionError
 export common.InterpolationDepthError
 export common.InterpolationMissingOptionError
+
+export dump.write
 
 
 type  # {{{1
@@ -210,6 +213,7 @@ proc writeConfig*(dict: Config, stream: Stream) =
 
 proc do_interpolation(self: ConfigParser, section, value: string,  # {{{1
                       level: int): string =
+    var value = value.replace("\n\t", " ")
     if isNil(self):
         return value
     if isNil(self.interpolation):
@@ -234,7 +238,7 @@ proc get_with_level(self: ConfigParser, section, option: string,  # {{{1
         err = err + 4
 
     # 3rd search in default section.
-    var tbl = self.data[""]
+    var tbl = self.data[self.secname_default]
     if tbl.hasKey(opt):
         ret = tbl[opt]
         return (do_interpolation(self, section, ret, level), 0)
@@ -242,37 +246,38 @@ proc get_with_level(self: ConfigParser, section, option: string,  # {{{1
     return ("", err)
 
 
-proc get*(self: ConfigParser, section, option, fallback: string,  # {{{1
-          raw = false, vars: TableRef[string, string] = nil): string =
+proc get_core(self: ConfigParser, section, option, fallback: string,  # {{{1
+              raw, f_fallback: bool, vars: TableRef[string, string]): string =
+    var (f_ret, ret, err) = (false, "", 0)
     var opt = self.optionxform.do_transform(option)
     if not isNil(vars):  # vars is 1st priority.
         if vars.hasKey(opt):
-            var ret = vars[opt]
-            return do_interpolation(self, section, ret, 1)
+            (f_ret, ret) = (true, vars[opt])
+    if not f_ret:
+        (ret, err) = self.get_with_level(section, option, 1)
+        if err == 0:
+            return ret
+    if (not f_ret) and f_fallback:
+        (f_ret, ret) = (true, fallback)
 
-    var (ret, err) = self.get_with_level(section, option, 1)
-    if err == 0:
-        return ret
-
-    return do_interpolation(self, section, fallback, 1)
-
-
-proc get*(self: ConfigParser, section, option: string, raw = false,  # {{{1
-          vars: TableRef[string, string] = nil): string =
-    var opt = self.optionxform.do_transform(option)
-    if not isNil(vars):  # vars is 1st priority.
-        if vars.hasKey(opt):
-            var ret = vars[opt]
-            return do_interpolation(self, section, ret, 1)
-
-    var (ret, err) = self.get_with_level(section, option, 1)
-    if err == 0:
-        return ret
+    if f_ret:
+        return do_interpolation(self, section, ret, 1)
 
     if (err and 4) != 0:
         raise newException(NoSectionError,
                            fmt"does not have section: '{section}'")
     raise newException(NoOptionError, "does not have option: " & opt)
+
+
+
+proc get*(self: ConfigParser, section, option, fallback: string,  # {{{1
+          raw = false, vars: TableRef[string, string] = nil): string =
+    return self.get_core(section, option, fallback, raw, true, vars)
+
+
+proc get*(self: ConfigParser, section, option: string, raw = false,  # {{{1
+          vars: TableRef[string, string] = nil): string =
+    return self.get_core(section, option, "", raw, false, vars)
 
 
 proc get*(self: SectionTable, option: string,  # {{{1
@@ -457,7 +462,9 @@ proc `[]`*(self: ConfigParser, section: string): var SectionTable =  # {{{1
 proc `[]`*(self: SectionTable, option: string): string =  # {{{1
     if not self.data.hasKey(option):
         raise newException(NoOptionError, "does not have option: " & option)
-    return self.data[option]
+    var ret = self.data[option]
+    ret = ret.replace("\n\t", " ")  # TODO(shimoda): fix it, make function.
+    return ret
 
 
 proc options*(self: ConfigParser, section: string): seq[string] =  # {{{1
