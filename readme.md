@@ -51,7 +51,6 @@ $ sudo apt intall nim
 
 TODO
 -----------------------------------------
-- `write` function.
 - complete `default section`
 - the delimiter option
 - the strict option
@@ -101,7 +100,7 @@ method / property       | impl. | memo
 `items()`                 | o   | ...
 `items()`                 | o   | ...
 `set()`                   | o   | ...
-`write()`                 |     |
+`write()`                 | o   | ...
 `remove_option()`         | o   | ...
 `remove_section()`        | o   | ...
 
@@ -156,7 +155,8 @@ see tests folder.
 Release
 -----------------------------------------
 | version | description |
-|:-------:|:---|
+|:-------:|:------------|
+| 0.3.0   | implement `write()` function |
 | 0.2.0   | rename to configparser, remove heading `py_` |
 | 0.1.0   | 1st version |
 
@@ -166,9 +166,9 @@ Donations
 ---------------------
 If you are feel to nice for this software, please donation to my
 
-- Bitcoin **| 1FTBAUaVdeGG9EPsGMD5j2SW8QHNc5HzjT |**
-- Ether **| 0xd7Dc5cd13BD7636664D6bf0Ee8424CFaF6b2FA8f |**
-- or librapay, I'm glad from smaller (about $1) and welcome more :D
+- Bitcoin **| 19AyoXxhm8nzgcxgbiXNPkiqNASfc999gJ |**
+- Ether **| 0x3a822c36cd5184f9ff162c7a55709f3d6d861608 |**
+- or librapay, I'm glad from smaller (about $1)
 
 <!--
 vi: ft=markdown:et:fdm=marker
