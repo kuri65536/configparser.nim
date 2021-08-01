@@ -12,7 +12,7 @@ import tables
 
 
 type  # {{{1
-  Error = object of Exception
+  Error = object of ValueError
   DuplicateSectionError* = object of Error
   DuplicateOptionError* = object of Error
   ParsingError* = object of Error
@@ -73,7 +73,8 @@ proc do_transform*(self: ref proc(src: string): string, src: string): string =  
 
 
 method run*(self: Interpolation, cfg: ConfigParser,  # {{{1
-            section, value: string, level: int): string {.base.} =
+            section, value: string, level: int): string
+            {.base, locks: "unknown".} =
     return value
 
 
