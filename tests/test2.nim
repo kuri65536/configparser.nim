@@ -200,6 +200,28 @@ test "extended interpolation - missing value":
         discard
 
 
+test "malformatted interpolation":  # {{{1
+    discard
+    #[
+    cf = self.fromstring(
+        "[sect]\n" "option1{eq}foo\n".format(eq=self.delimiters[0])
+    )
+
+    self.assertEqual(cf.get('sect', "option1"), "foo")
+
+    cf.set("sect", "option1", "%foo")
+    self.assertEqual(cf.get('sect', "option1"), "%foo")
+    cf.set("sect", "option1", "foo%")
+    self.assertEqual(cf.get('sect', "option1"), "foo%")
+    cf.set("sect", "option1", "f%oo")
+    self.assertEqual(cf.get('sect', "option1"), "f%oo")
+
+    # bug #5741: double percents are *not* malformed
+    cf.set("sect", "option2", "foo%%bar")
+    self.assertEqual(cf.get("sect", "option2"), "foo%%bar")
+    ]#
+
+
 #[
 test "read file":  # covered in read()
             var parser = ConfigParser()

@@ -34,7 +34,7 @@ test "can basic parse":
     ini.read_string("test = test")
     check ini.get("", "test") == "test"
 
-test "can basic parse - 2":
+test "can basic parse - 2":  # {{{1
     var ini = ConfigParser()
     ini.read_file(newStringStream("test = test\ntest2 = aaa"))
     check ini.get("", "test2") == "aaa"
