@@ -8,6 +8,7 @@ v.2.0. If a copy of the MPL was not distributed with this file,
 You can obtain one at https://mozilla.org/MPL/2.0/.
 ]#  # import {{{1
 import strutils
+import system
 import tables
 
 
@@ -34,6 +35,7 @@ type  # {{{1
     data*: TableRef[string, SectionTable]
     tbl_defaults*: SectionTable
     secname_default*: string
+    delimiters*: seq[string]
     comment_prefixes*: seq[string]
     inline_comment_prefixes*: seq[string]
     optionxform*: ref proc(src: string): string
@@ -44,25 +46,32 @@ type  # {{{1
 
 
 proc clear*(cf: var ConfigParser,  # {{{1
+            delimiters: seq[string] = @["=", ":"],
             comment_prefixes: seq[string] = @["#", ";"],
             inline_comment_prefixes: seq[string] = @[";"],
+            default_section = "DEFAULT",
             interpolation: Interpolation = nil
             ): ConfigParser {.discardable.} =
     cf.data = newTable[string, SectionTable]()
-    cf.secname_default = "DEFAULT"
+    cf.secname_default = default_section
     cf.MAX_INTERPOLATION_DEPTH = 10
 
+    cf.delimiters = delimiters
     cf.comment_prefixes = comment_prefixes
     cf.inline_comment_prefixes = inline_comment_prefixes
     cf.interpolation = interpolation
     return cf
 
 
-proc initConfigParser*(comment_prefixes = @["#", ";"],  # {{{1
+proc initConfigParser*(delimiters = @["=", ":"],  # {{{1
+                       comment_prefixes = @["#", ";"],
                        inline_comment_prefixes = @[";"],
+                       default_section = "DEFAULT",
                        interpolation: Interpolation = nil): ConfigParser =
     var ret = ConfigParser()
-    return ret.clear(comment_prefixes, inline_comment_prefixes, interpolation)
+    return ret.clear(delimiters,
+                     comment_prefixes, inline_comment_prefixes,
+                     default_section, interpolation)
 
 
 proc do_transform*(self: ref proc(src: string): string, src: string): string =  # {{{1

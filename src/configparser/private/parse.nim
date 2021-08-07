@@ -67,6 +67,13 @@ proc defaults*(self: ConfigParser): SectionTable =  # {{{1
     return self.tbl_defaults
 
 
+proc is_start_with(src: string, patterns: seq[string]): int =  # {{{1
+    for i in patterns:
+        if src.startsWith(i):
+            return len(i)
+    return 0
+
+
 proc is_match(patterns: seq[string], n: int, line: string, f_space: bool  # {{{1
               ): bool =
     if not f_space:
@@ -155,7 +162,7 @@ proc parse_section_line(self: ParserStatus, c: var ConfigParser,   # {{{1
 proc parse_option_value(self: ParserStatus,  # {{{1
                         c: var ConfigParser, line: string
                         ): tuple[st: ParseResult, opt, val: string] =
-    let splitter_opt_val = {'=', ':'}
+    let splitter_opt_val = c.delimiters
     var f_opt = true
     var f_space = false
     var opt, val: string
@@ -164,13 +171,17 @@ proc parse_option_value(self: ParserStatus,  # {{{1
     if n_start < 0:
         return (in_empty, "", "")
 
-    for n in n_start..len(line) - 1:
+    var n = -1
+    while n < len(line) - 1:
+        n += 1
+        var part = line[n ..^ 1]
         var i = line[n]
         if f_opt:
             if c.is_comment(n, line, true):
                 break
-            if splitter_opt_val.contains(i):
-                f_opt = false
+            var match = is_start_with(part, splitter_opt_val)
+            if match > 0:
+                (f_opt, n) = (false, n + match - 1)
                 opt = opt.strip()
                 continue
             if i == '[':
