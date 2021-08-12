@@ -130,7 +130,7 @@ Development Environment
 | term | description   |
 |:----:|:--------------|
 | OS   | Debian on Android 10 |
-| lang | nim |
+| lang | nim 0.19.4 (OS default) |
 
 
 
@@ -156,6 +156,7 @@ Release
 -----------------------------------------
 | version | description |
 |:-------:|:------------|
+| 0.3.1   | bugfix for `read_file()` |
 | 0.3.0   | implement `write()` function |
 | 0.2.0   | rename to configparser, remove heading `py_` |
 | 0.1.0   | 1st version |
