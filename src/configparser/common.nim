@@ -38,7 +38,7 @@ type  # {{{1
     delimiters*: seq[string]
     comment_prefixes*: seq[string]
     inline_comment_prefixes*: seq[string]
-    optionxform*: ref proc(src: string): string
+    optionxform*: proc(src: string): string {.gcsafe.}
     interpolation*: Interpolation
     BOOLEAN_STATES*: TableRef[string, bool]
     MAX_INTERPOLATION_DEPTH*: int
@@ -74,15 +74,17 @@ proc initConfigParser*(delimiters = @["=", ":"],  # {{{1
                      default_section, interpolation)
 
 
-proc do_transform*(self: ref proc(src: string): string, src: string): string =  # {{{1
+proc do_transform*(self: proc(src: string): string, src: string
+                   ): string = # {{{1
     result = src.toLower()
     if isNil(self):
         return result
-    return self[](src)
+    return self(src)
 
 
 method run*(self: Interpolation, cfg: ConfigParser,  # {{{1
-            section, value: string, level: int): string {.base.} =
+            section, value: string, level: int
+            ): string {.base, gcsafe, locks: "unknown".} =
     return value
 
 

@@ -66,9 +66,9 @@ type  # {{{1
 
 
 # api for the SectionTable {{{1
-proc hasKey*(self: SectionTable, option: string): bool
-proc del*(self: var SectionTable, option: string): bool {.discardable.}
-proc `[]`*(self: SectionTable, option: string): string
+proc hasKey*(self: SectionTable, option: string): bool {.gcsafe.}
+proc del*(self: var SectionTable, option: string): bool {.discardable, gcsafe.}
+proc `[]`*(self: SectionTable, option: string): string {.gcsafe.}
 
 
 proc initBasicInterpolation*(): BasicInterpolation =  # {{{1
@@ -538,7 +538,7 @@ proc resolve_interpolation(self: BasicInterpolation, cfg: ConfigParser,  # {{{1
 
 
 method run(self: BasicInterpolation, cfg: ConfigParser,  # {{{1
-           section, value: string, level: int): string =
+           section, value: string, level: int): string {.gcsafe.} =
     proc run_in_else(ch: char, dst: var seq[tuple[s: string, f: bool]]): bool =
         case ch:
         of '%':
