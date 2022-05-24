@@ -13,7 +13,7 @@ import tables
 
 
 type  # {{{1
-  Error = object of Exception
+  Error = object of ValueError
   DuplicateSectionError* = object of Error
   DuplicateOptionError* = object of Error
   ParsingError* = object of Error

@@ -8,8 +8,6 @@ v.2.0. If a copy of the MPL was not distributed with this file,
 You can obtain one at https://mozilla.org/MPL/2.0/.
 ]#  # import {{{1
 
-import streams
-import strformat
 import strutils
 import tables
 
@@ -43,7 +41,7 @@ proc add_section(self: var ConfigParser, section: string  # {{{1
     if section not_in self.sections_local():
         result = SectionTable(name: section)
         result.data = newTable[string, string]()
-        self.data.add(section, result)
+        self.data[section] = result
         return result
 
     if section == self.secname_default:
@@ -60,7 +58,7 @@ proc add_option(self: var SectionTable, opt, val: string  # {{{1
     if self.data.hasKey(opt):
         raise newException(DuplicateOptionError,
                            "option duplicated:" & opt)
-    self.data.add(opt, val)
+    self.data[opt] = val
 
 
 proc defaults*(self: ConfigParser): SectionTable =  # {{{1
@@ -219,9 +217,9 @@ proc parse*(c: var ConfigParser, input: iterator(): string): void =  # {{{1
     var stat = ParserStatus()
     stat.cur_section = c.tbl_defaults
     stat.cur_section_name = c.secname_default
-    c.data.add(c.secname_default, stat.cur_section)
+    c.data[c.secname_default] = stat.cur_section
 
-    var line, cur_opt, cur_val: string
+    var cur_opt, cur_val: string
     var cur = ParseResult.in_empty
     for line in input():
         var (st, opt, val) = stat.parse_option_value(c, line)

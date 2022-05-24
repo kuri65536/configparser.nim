@@ -7,7 +7,6 @@ You can obtain one at https://mozilla.org/MPL/2.0/.
 ]#
 import algorithm
 import streams
-import strutils
 import tables
 import unittest
 
@@ -203,7 +202,7 @@ test "api: parser.get*() w/vars":  # {{{1
 
     # override by vars.
     var vars = newTable[string, string]()
-    vars.add("simplekey", "ghi")
+    vars["simplekey"] = "ghi"
     check cf.get("Simple Test", "simplekey", vars=vars) == "ghi"
 
     expect NoSectionError:
@@ -233,8 +232,8 @@ test "api: parser.get*() w/vars":  # {{{1
 
 test "api w/sections - get, vars and fallback":  # {{{1
     var cf = basic_test()
-    var section = cf["include prefix spaces"]
     #[ TODO(shimoda): impl.
+    let section = cf["include prefix spaces"]
     check section.name == "include prefix spaces"
     check section.parser == cf
     ]#
@@ -378,7 +377,6 @@ test "can load duplicated contents":  # {{{1
         skip()
     var cf = basic_test()
     cf.f_allow_dups = true
-    var (d1, d2) = (cfg.delimiters[0], cfg.delimiters[1])
     cf.read_string(conv_delim([
         "[Duplicate Options Here]",
         "option {d0} with a value",

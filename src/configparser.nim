@@ -102,7 +102,7 @@ proc add_section*(self: var ConfigParser, section: string  # {{{1
     var ret = SectionTable(name: section)
     ret.parser = self
     ret.data = newTable[string, string]()
-    self.data.add(section, ret)
+    self.data[section] = ret
 
 
 proc defaults*(self: ConfigParser): SectionTable =  # {{{1
@@ -346,7 +346,7 @@ proc getfloat*(self: ConfigParser, section, option: string,  # {{{1
         var src = self.get(section, option, raw, vars)
         var ret = parseFloat(src)
         return ret
-    except NoOptionError as e:
+    except NoOptionError:
         discard
     return fallback
 
@@ -443,7 +443,7 @@ proc getlist*(self: ConfigParser, section, option: string, raw = false,  # {{{1
     try:
         var src = self.get(section, option, raw, vars)
         return getlist_parse(src)
-    except NoOptionError as e:
+    except NoOptionError:
         discard
     return fallback
 
@@ -487,7 +487,7 @@ proc set*(self: var ConfigParser, section, option, value: string  # {{{1
     if tbl.hasKey(opt):
         raise newException(DuplicateOptionError, "option duplicated: " &
                            section & "-" & opt)
-    tbl.data.add(opt, value)
+    tbl.data[opt] = value
 
 
 proc read_dict*(c: var ConfigParser,  # {{{1
