@@ -149,6 +149,8 @@ proc read_file*(c: var ConfigParser, input: Stream, source = ""): void =  # {{{1
         while input.readLine(line):
             yield line
 
+    if isNil(c.data):
+        c.clear()
     c.parse(iter_lines)
 
 

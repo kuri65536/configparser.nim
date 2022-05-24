@@ -36,6 +36,11 @@ test "can basic parse":
 test "can basic parse - 2":  # {{{1
     var ini = ConfigParser()
     ini.read_file(newStringStream("test = test\ntest2 = aaa"))
+    #[ for debug
+    for tup in ini.items():
+        echo "section: " & tup.section
+        echo $tup.options.data
+    ]#
     check ini.get("", "test2") == "aaa"
 
 test "can basic parse - 3":
