@@ -1,6 +1,6 @@
 # Package
 
-version       = "0.2.2"
+version       = "0.2.3"
 author        = "shimoda"
 description   = "yet another .ini parser for compat python API."
 license       = "MPL-2"
