@@ -1,0 +1,55 @@
+# This is a basic workflow to help you get started with Actions
+
+name: CI
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push or pull request events but only for the main branch
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  nimlatest: "2.0.4"
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  build:
+    strategy:
+      matrix:
+        nimver: ["2.0.4"]
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+    - uses: actions/checkout@v4
+
+    - uses: iffy/install-nim@v5
+      with:
+        version: ${{ matrix.nimver }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - uses: actions/cache@v4
+      with:
+        path: /usr/bin
+        key:  ${{ runner.os }}-build-${{ hashFiles('nim') }}
+
+    - name: run with testament
+      run:  bash build.sh tests
+
+    - name: make documents
+      if:   ${{ matrix.nimver == env.nimlatest }}
+      run:  bash build.sh doc
+
+    - name: deploy to github pages
+      uses: peaceiris/actions-gh-pages@v3
+      if:   ${{ matrix.nimver == env.nimlatest }}
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir:  ./html
+

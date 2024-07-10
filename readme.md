@@ -130,7 +130,7 @@ Development Environment
 | term | description   |
 |:----:|:--------------|
 | OS   | Debian on Android 10 |
-| lang | nim |
+| lang | nim 0.19.4 (OS default) |
 
 
 
@@ -156,7 +156,10 @@ Release
 -----------------------------------------
 | version | description |
 |:-------:|:------------|
-| 0.3.0   | implement `write()` function |
+| 0.2.4   | fix to build against nim 2.0.4 |
+| 0.2.3   | fix to reduce warnings in nim 1.4.6 |
+| 0.2.2   | bugfix for `read_file()` |
+| 0.2.1   | implement `write()` function |
 | 0.2.0   | rename to configparser, remove heading `py_` |
 | 0.1.0   | 1st version |
 
