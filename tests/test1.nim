@@ -29,14 +29,23 @@ proc almostEqual(f1, f2: float): bool =  # {{{1
 
 
 test "can basic parse":
+  proc tmp() {.gcsafe.} =
     var ini = ConfigParser()
     ini.read_string("test = test")
     check ini.get("", "test") == "test"
+  tmp()
 
 test "can basic parse - 2":  # {{{1
+  proc tmp() {.gcsafe.} =
     var ini = ConfigParser()
     ini.read_file(newStringStream("test = test\ntest2 = aaa"))
+    #[ for debug
+    for tup in ini.items():
+        echo "section: " & tup.section
+        echo $tup.options.data
+    ]#
     check ini.get("", "test2") == "aaa"
+  tmp()
 
 test "can basic parse - 3":
     var ini = ConfigParser()

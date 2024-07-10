@@ -206,7 +206,7 @@ proc parse_option_value(self: ParserStatus,  # {{{1
     return (opt_and_val, opt, val)
 
 
-proc parse*(c: var ConfigParser, input: iterator(): string): void =  # {{{1
+proc parse*(c: var ConfigParser, input: iterator(): string {.gcsafe.}): void =
     if isNil(c.tbl_defaults):
         var sec = SectionTable(name: c.secname_default)
         sec.data = newTable[string, string]()
@@ -242,4 +242,4 @@ proc parse*(c: var ConfigParser, input: iterator(): string): void =  # {{{1
 
 
 # end of file {{{1
-# vi: ft=nim:et:ts=4:fdm=marker:nowrap
+# vi: ft=nim:et:ts=4:nowrap

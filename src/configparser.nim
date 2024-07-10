@@ -137,7 +137,7 @@ proc del*(self: var SectionTable, option: string  # {{{1
     return true
 
 
-proc read*(c: var ConfigParser, input: iterator(): string): void =  # {{{1
+proc read*(c: var ConfigParser, input: iterator(): string {.gcsafe.}): void =
     if isNil(c.data):
         c.clear()
     c.parse(input)
@@ -149,6 +149,8 @@ proc read_file*(c: var ConfigParser, input: Stream, source = ""): void =  # {{{1
         while input.readLine(line):
             yield line
 
+    if isNil(c.data):
+        c.clear()
     c.parse(iter_lines)
 
 
@@ -679,4 +681,4 @@ proc items*(self: ConfigParser, raw: bool = false,  # {{{1
 
 
 # end of file {{{1
-# vi: ft=nim:et:ts=4:fdm=marker:nowrap
+# vi: ft=nim:et:ts=4:nowrap

@@ -74,7 +74,7 @@ proc initConfigParser*(delimiters = @["=", ":"],  # {{{1
                      default_section, interpolation)
 
 
-proc do_transform*(self: proc(src: string): string, src: string
+proc do_transform*(self: proc(src: string): string {.gcsafe.}, src: string
                    ): string = # {{{1
     result = src.toLower()
     if isNil(self):
